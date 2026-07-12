@@ -1,0 +1,17 @@
+# Claude Code local/session settings — machine-specific, not for sharing
+.claude/settings.local.json
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+*.swp
+*.swo
+
+# Packaged extension artifacts
+*.zip
+*.crx
+*.pem
