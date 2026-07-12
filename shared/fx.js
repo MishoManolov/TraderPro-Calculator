@@ -10,10 +10,6 @@
   // the supported account currencies for this Bulgarian-market extension).
   var EUR_BGN_PEG = 1.95583;
 
-  function describeError(err) {
-    return (err && err.message) || String(err);
-  }
-
   /** @returns {Promise<{from,to,rate:number,source:'identity'|'yahoo'|'frankfurter'|'bgn-peg',asOf:string}>} */
   function fetchFxRate(from, to) {
     if (from === to) {
@@ -23,7 +19,7 @@
       return fetchFxRateFrankfurter(from, to).catch(function (frankfurterErr) {
         return fetchFxRateBgnPeg(from, to).catch(function (pegErr) {
           // Surface all three underlying errors — see the matching note in quotes.js.
-          throw new Error('Yahoo: ' + describeError(yahooErr) + ' | Frankfurter: ' + describeError(frankfurterErr) + ' | ' + describeError(pegErr));
+          throw new Error('Yahoo: ' + TPS.format.describeError(yahooErr) + ' | Frankfurter: ' + TPS.format.describeError(frankfurterErr) + ' | ' + TPS.format.describeError(pegErr));
         });
       });
     });

@@ -57,9 +57,33 @@
     return globalOverride !== null && globalOverride !== undefined && isFinite(globalOverride) ? globalOverride : statedPercent;
   }
 
+  // Composes computePositionSize() with the formatted strings every renderer
+  // needs (content.js and popup.js both do this exact sequence) — see
+  // shared/format.js for the individual formatters this calls into.
+  function computeAndFormat(state, settings) {
+    var effectivePercent = resolveEffectivePercent(state.statedPercent, settings.positionPercentOverride);
+    var result = computePositionSize({
+      accountBalance: settings.accountBalance,
+      percent: effectivePercent,
+      priceInPositionCurrency: state.quote.price,
+      fxRate: state.fx.rate,
+      roundingMode: settings.roundingMode,
+      roundUpThresholdAmount: settings.roundUpThresholdAmount
+    });
+    return {
+      effectivePercent: effectivePercent,
+      result: result,
+      percentText: TPS.format.formatPercent(effectivePercent),
+      priceText: TPS.format.formatMoney(state.quote.price, state.quote.currency),
+      sharesText: TPS.format.formatShares(result.shares, settings.roundingMode),
+      totalAccountText: TPS.format.formatMoney(result.totalAccountCurrency, settings.accountCurrency)
+    };
+  }
+
   global.TPS.sizing = {
     computePositionSize: computePositionSize,
     roundShares: roundShares,
-    resolveEffectivePercent: resolveEffectivePercent
+    resolveEffectivePercent: resolveEffectivePercent,
+    computeAndFormat: computeAndFormat
   };
 })(typeof self !== 'undefined' ? self : this);

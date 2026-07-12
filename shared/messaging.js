@@ -20,10 +20,29 @@
     return chrome.tabs.sendMessage(tabId, { type: MSG.GET_SIGNALS });
   }
 
+  function requestQuoteOrThrow(ticker, fallbackMessage) {
+    return requestQuote(ticker).then(function (response) {
+      if (!response || !response.ok) throw new Error((response && response.error) || fallbackMessage);
+      return response.data;
+    });
+  }
+
+  function resolveFxRate(quoteCurrency, accountCurrency, fallbackMessage) {
+    if (quoteCurrency === accountCurrency) {
+      return Promise.resolve({ rate: 1, source: 'identity' });
+    }
+    return requestFxRate(quoteCurrency, accountCurrency).then(function (response) {
+      if (!response || !response.ok) throw new Error((response && response.error) || fallbackMessage);
+      return response.data;
+    });
+  }
+
   global.TPS.messaging = {
     MSG: MSG,
     requestQuote: requestQuote,
     requestFxRate: requestFxRate,
-    requestSignalsFromTab: requestSignalsFromTab
+    requestSignalsFromTab: requestSignalsFromTab,
+    requestQuoteOrThrow: requestQuoteOrThrow,
+    resolveFxRate: resolveFxRate
   };
 })(typeof self !== 'undefined' ? self : this);

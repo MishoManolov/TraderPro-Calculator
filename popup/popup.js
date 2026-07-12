@@ -141,10 +141,11 @@
     return li;
   }
 
+  var escapeHtmlScratchDiv = document.createElement('div');
+
   function escapeHtml(text) {
-    var div = document.createElement('div');
-    div.textContent = text || '';
-    return div.innerHTML;
+    escapeHtmlScratchDiv.textContent = text || '';
+    return escapeHtmlScratchDiv.innerHTML;
   }
 
   function updatePercentDisplay(item, state, settings) {
@@ -157,14 +158,9 @@
     var state = { quote: null, fx: null, statedPercent: signal.statedPercent };
     renderedItems.push({ item: item, state: state });
 
-    TPS.messaging.requestQuote(signal.ticker).then(function (quoteResponse) {
-      if (!quoteResponse || !quoteResponse.ok) throw new Error((quoteResponse && quoteResponse.error) || 'Грешка при цена');
-      state.quote = quoteResponse.data;
-      if (state.quote.currency === settings.accountCurrency) return { rate: 1, source: 'identity' };
-      return TPS.messaging.requestFxRate(state.quote.currency, settings.accountCurrency).then(function (fxResponse) {
-        if (!fxResponse || !fxResponse.ok) throw new Error((fxResponse && fxResponse.error) || 'Грешка при валутен курс');
-        return fxResponse.data;
-      });
+    TPS.messaging.requestQuoteOrThrow(signal.ticker, 'Грешка при цена').then(function (quote) {
+      state.quote = quote;
+      return TPS.messaging.resolveFxRate(quote.currency, settings.accountCurrency, 'Грешка при валутен курс');
     }).then(function (fx) {
       state.fx = fx;
       renderResult(item, state, settings);
@@ -177,27 +173,17 @@
 
   function renderResult(item, state, settings) {
     if (!state.quote || !state.fx) return;
-    var effectivePercent = TPS.sizing.resolveEffectivePercent(state.statedPercent, settings.positionPercentOverride);
-    var result = TPS.sizing.computePositionSize({
-      accountBalance: settings.accountBalance,
-      percent: effectivePercent,
-      priceInPositionCurrency: state.quote.price,
-      fxRate: state.fx.rate,
-      roundingMode: settings.roundingMode,
-      roundUpThresholdAmount: settings.roundUpThresholdAmount
-    });
+    var computed = TPS.sizing.computeAndFormat(state, settings);
 
-    item.querySelector('.tps-percent-value').textContent = TPS.format.formatPercent(effectivePercent);
-    item.querySelector('.tps-price-value').textContent = TPS.format.formatMoney(state.quote.price, state.quote.currency);
-    item.querySelector('.tps-shares-value').textContent = TPS.format.formatShares(result.shares, settings.roundingMode);
-    item.querySelector('.tps-total-account-value').textContent = TPS.format.formatMoney(result.totalAccountCurrency, settings.accountCurrency);
+    item.querySelector('.tps-percent-value').textContent = computed.percentText;
+    item.querySelector('.tps-price-value').textContent = computed.priceText;
+    item.querySelector('.tps-shares-value').textContent = computed.sharesText;
+    item.querySelector('.tps-total-account-value').textContent = computed.totalAccountText;
 
     var badgeEl = item.querySelector('.tps-source-badge');
-    var badgeParts = [];
-    if (state.quote.source !== 'yahoo') badgeParts.push('цена: ' + state.quote.source + ' (прибл.)');
-    if (state.fx.source && state.fx.source !== 'yahoo' && state.fx.source !== 'identity') badgeParts.push('курс: ' + state.fx.source);
-    badgeEl.textContent = badgeParts.join(' · ');
-    badgeEl.hidden = badgeParts.length === 0;
+    var badgeText = TPS.format.describeSourceBadge(state.quote, state.fx);
+    badgeEl.textContent = badgeText;
+    badgeEl.hidden = badgeText.length === 0;
   }
 
   function init() {

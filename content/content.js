@@ -108,6 +108,16 @@
         var group = buildFieldsGroup(state, settings);
         body.appendChild(group);
       }
+      state.dom = body ? {
+        group: group,
+        percentEl: group.querySelector('.tps-percent-value'),
+        priceEl: group.querySelector('.tps-price-value'),
+        sharesEl: group.querySelector('.tps-shares-value'),
+        totalPositionEl: group.querySelector('.tps-total-position-value'),
+        totalAccountEl: group.querySelector('.tps-total-account-value'),
+        metaRow: group.querySelector('[data-tps-field="meta"]'),
+        metaValueEl: group.querySelector('.tps-meta-value')
+      } : null;
 
       if (!settings.accountBalance) {
         setMeta(cardId, 'hint', 'Задайте наличност по сметка в изскачащия прозорец на добавката.');
@@ -121,32 +131,22 @@
     var state = cardStates.get(cardId);
     if (!state) return;
 
+    var loadedSettings;
+
     Promise.all([
-      TPS.messaging.requestQuote(state.ticker),
+      TPS.messaging.requestQuoteOrThrow(state.ticker, 'Неуспешно зареждане на цена'),
       TPS.storage.getSettings()
     ]).then(function (results) {
-      var quoteResponse = results[0];
+      var quote = results[0];
       var settings = results[1];
-      if (!quoteResponse || !quoteResponse.ok) {
-        throw new Error((quoteResponse && quoteResponse.error) || 'Неуспешно зареждане на цена');
-      }
-      var quote = quoteResponse.data;
+      loadedSettings = settings;
       state.quote = quote;
-
-      if (quote.currency === settings.accountCurrency) {
-        return { rate: 1, source: 'identity' };
-      }
-      return TPS.messaging.requestFxRate(quote.currency, settings.accountCurrency).then(function (fxResponse) {
-        if (!fxResponse || !fxResponse.ok) {
-          throw new Error((fxResponse && fxResponse.error) || 'Неуспешно зареждане на валутен курс');
-        }
-        return fxResponse.data;
-      });
+      return TPS.messaging.resolveFxRate(quote.currency, settings.accountCurrency, 'Неуспешно зареждане на валутен курс');
     }).then(function (fx) {
       state.fx = fx;
       state.status = 'ready';
       state.errorMessage = null;
-      renderCardResult(cardId);
+      renderCardResult(cardId, loadedSettings);
     }).catch(function (err) {
       state.status = 'error';
       state.errorMessage = String((err && err.message) || err);
@@ -157,17 +157,13 @@
   function loadFxOnly(cardId) {
     var state = cardStates.get(cardId);
     if (!state || !state.quote) return Promise.resolve();
+    var loadedSettings;
     return TPS.storage.getSettings().then(function (settings) {
-      if (state.quote.currency === settings.accountCurrency) {
-        state.fx = { rate: 1, source: 'identity' };
-        return;
-      }
-      return TPS.messaging.requestFxRate(state.quote.currency, settings.accountCurrency).then(function (fxResponse) {
-        if (!fxResponse || !fxResponse.ok) throw new Error((fxResponse && fxResponse.error) || 'FX error');
-        state.fx = fxResponse.data;
-      });
-    }).then(function () {
-      renderCardResult(cardId);
+      loadedSettings = settings;
+      return TPS.messaging.resolveFxRate(state.quote.currency, settings.accountCurrency, 'FX error');
+    }).then(function (fx) {
+      state.fx = fx;
+      renderCardResult(cardId, loadedSettings);
     }).catch(function (err) {
       state.status = 'error';
       state.errorMessage = String((err && err.message) || err);
@@ -208,17 +204,11 @@
     return wrapper;
   }
 
-  function getGroupEl(cardId) {
-    var state = cardStates.get(cardId);
-    if (!state || !state.cardEl) return null;
-    return state.cardEl.querySelector('[data-tps-block-for="' + cardId + '"]');
-  }
-
   function setMeta(cardId, kind, text) {
-    var group = getGroupEl(cardId);
-    if (!group) return;
-    var metaRow = group.querySelector('[data-tps-field="meta"]');
-    var metaValueEl = group.querySelector('.tps-meta-value');
+    var state = cardStates.get(cardId);
+    if (!state || !state.dom) return;
+    var metaRow = state.dom.metaRow;
+    var metaValueEl = state.dom.metaValueEl;
     if (!metaRow || !metaValueEl) return;
     if (!text) {
       metaRow.hidden = true;
@@ -232,40 +222,27 @@
 
   // ---------- rendering ----------
 
-  function renderCardResult(cardId) {
+  function renderCardResult(cardId, settings) {
     var state = cardStates.get(cardId);
-    var group = getGroupEl(cardId);
-    if (!state || !group || !state.quote || !state.fx) return;
+    if (!state || !state.dom || !state.quote || !state.fx) return;
 
-    TPS.storage.getSettings().then(function (settings) {
-      var effectivePercent = TPS.sizing.resolveEffectivePercent(state.statedPercent, settings.positionPercentOverride);
-      var result = TPS.sizing.computePositionSize({
-        accountBalance: settings.accountBalance,
-        percent: effectivePercent,
-        priceInPositionCurrency: state.quote.price,
-        fxRate: state.fx.rate,
-        roundingMode: settings.roundingMode,
-        roundUpThresholdAmount: settings.roundUpThresholdAmount
-      });
+    var computed = TPS.sizing.computeAndFormat(state, settings);
 
-      group.querySelector('.tps-percent-value').textContent = TPS.format.formatPercent(effectivePercent);
-      group.querySelector('.tps-price-value').textContent = TPS.format.formatMoney(state.quote.price, state.quote.currency);
-      group.querySelector('.tps-shares-value').textContent = TPS.format.formatShares(result.shares, settings.roundingMode);
-      group.querySelector('.tps-total-position-value').textContent = TPS.format.formatMoney(result.totalPositionCurrency, state.quote.currency);
-      group.querySelector('.tps-total-account-value').textContent = TPS.format.formatMoney(result.totalAccountCurrency, settings.accountCurrency);
+    state.dom.percentEl.textContent = computed.percentText;
+    state.dom.priceEl.textContent = computed.priceText;
+    state.dom.sharesEl.textContent = computed.sharesText;
+    state.dom.totalPositionEl.textContent = TPS.format.formatMoney(computed.result.totalPositionCurrency, state.quote.currency);
+    state.dom.totalAccountEl.textContent = computed.totalAccountText;
 
-      var badgeParts = [];
-      if (state.quote.source !== 'yahoo') badgeParts.push('цена: ' + state.quote.source + ' (прибл.)');
-      if (state.fx.source && state.fx.source !== 'yahoo' && state.fx.source !== 'identity') badgeParts.push('курс: ' + state.fx.source);
+    var badgeText = TPS.format.describeSourceBadge(state.quote, state.fx);
 
-      if (!settings.accountBalance) {
-        setMeta(cardId, 'hint', 'Задайте наличност по сметка в изскачащия прозорец на добавката.');
-      } else if (badgeParts.length) {
-        setMeta(cardId, 'badge', badgeParts.join(' · '));
-      } else {
-        setMeta(cardId, null, '');
-      }
-    });
+    if (!settings.accountBalance) {
+      setMeta(cardId, 'hint', 'Задайте наличност по сметка в изскачащия прозорец на добавката.');
+    } else if (badgeText) {
+      setMeta(cardId, 'badge', badgeText);
+    } else {
+      setMeta(cardId, null, '');
+    }
   }
 
   function renderCardError(cardId, message) {
@@ -282,8 +259,7 @@
       // The static "Позиция %" value must reflect the new global override even
       // for cards still loading/errored (not just 'ready' ones).
       if (percentChanged) {
-        var group = getGroupEl(cardId);
-        var percentEl = group && group.querySelector('.tps-percent-value');
+        var percentEl = state.dom && state.dom.percentEl;
         if (percentEl) {
           percentEl.textContent = TPS.format.formatPercent(
             TPS.sizing.resolveEffectivePercent(state.statedPercent, newSettings.positionPercentOverride)
@@ -294,7 +270,7 @@
       if (currencyChanged) {
         loadFxOnly(cardId);
       } else {
-        renderCardResult(cardId);
+        renderCardResult(cardId, newSettings);
       }
     });
   }

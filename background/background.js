@@ -2,6 +2,7 @@
 importScripts(
   '../shared/storage.js',
   '../shared/messaging.js',
+  '../shared/format.js',
   '../shared/quotes.js',
   '../shared/fx.js'
 );
