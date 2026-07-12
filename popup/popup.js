@@ -10,15 +10,50 @@
   ];
 
   var els = {
-    balanceSummary: document.getElementById('balanceSummary'),
+    accountBalanceInput: document.getElementById('accountBalanceInput'),
+    balanceCurrencyPrefix: document.getElementById('balanceCurrencyPrefix'),
+    balanceSavedIndicator: document.getElementById('balanceSavedIndicator'),
     emptyState: document.getElementById('emptyState'),
     signalsList: document.getElementById('signalsList'),
     openOptionsBtn: document.getElementById('openOptionsBtn')
   };
 
+  var renderedItems = []; // {item, state} for every signal currently rendered, so a balance edit can re-render them all
+
   els.openOptionsBtn.addEventListener('click', function () {
     chrome.runtime.openOptionsPage();
   });
+
+  function bindBalanceInput(settings) {
+    els.balanceCurrencyPrefix.textContent = TPS.format.currencySymbol(settings.accountCurrency);
+    els.accountBalanceInput.value = settings.accountBalance;
+
+    var saveTimer = null;
+    var indicatorTimer = null;
+
+    els.accountBalanceInput.addEventListener('input', function () {
+      var value = parseFloat(els.accountBalanceInput.value);
+      if (!isFinite(value) || value < 0) return;
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(function () {
+        settings.accountBalance = value; // shared reference — every closure below sees the update immediately
+        TPS.storage.setSettings({ accountBalance: value }).then(function () {
+          els.balanceSavedIndicator.hidden = false;
+          if (indicatorTimer) clearTimeout(indicatorTimer);
+          indicatorTimer = setTimeout(function () {
+            els.balanceSavedIndicator.hidden = true;
+          }, 1200);
+        });
+        renderedItems.forEach(function (entry) {
+          renderResult(entry.item, entry.state, settings);
+        });
+      }, 300);
+    });
+
+    // Single click to open the popup is enough to start editing — no extra click needed.
+    els.accountBalanceInput.focus();
+    els.accountBalanceInput.select();
+  }
 
   function getActiveTab() {
     return chrome.tabs.query({ active: true, currentWindow: true }).then(function (tabs) {
@@ -44,6 +79,7 @@
     els.emptyState.hidden = true;
     els.signalsList.hidden = false;
     els.signalsList.innerHTML = '';
+    renderedItems = [];
     signals.forEach(function (signal) {
       var item = buildSignalItem(signal, settings);
       els.signalsList.appendChild(item);
@@ -81,6 +117,7 @@
 
   function loadAndRenderSignal(item, signal, settings) {
     var state = { quote: null, fx: null };
+    renderedItems.push({ item: item, state: state });
 
     TPS.messaging.requestQuote(signal.ticker).then(function (quoteResponse) {
       if (!quoteResponse || !quoteResponse.ok) throw new Error((quoteResponse && quoteResponse.error) || 'Грешка при цена');
@@ -141,7 +178,7 @@
 
   function init() {
     TPS.storage.getSettings().then(function (settings) {
-      els.balanceSummary.textContent = TPS.format.formatMoney(settings.accountBalance, settings.accountCurrency) + ' наличност';
+      bindBalanceInput(settings);
 
       getActiveTab().then(function (tab) {
         if (!tab || !tab.id) {

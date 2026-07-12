@@ -1,5 +1,17 @@
 // content/content.js — card discovery, injection, live pricing, MutationObserver
+//
+// Injection philosophy: new/changed values are rendered as ordinary ".t09_bl" rows
+// (the same label/value block the site itself uses for every other field), so they
+// inherit the site's own typography/spacing and read as a natural continuation of
+// the card — not a bolted-on box. To still make clear this content isn't part of the
+// original signal: (1) a single small header row introduces the appended section,
+// (2) every extension-touched row (including the "Количество" field, which is turned
+// into an editable input in place rather than duplicated) carries a thin accent bar
+// and a marker icon with an explanatory tooltip on hover.
 (function () {
+  var TOOLTIP_ADDED = 'Добавено от разширението TraderPRO Position Sizer — не е част от оригиналния сигнал';
+  var TOOLTIP_EDITABLE = 'Стойността може да се редактира — добавено от TraderPRO Position Sizer';
+
   var cardStates = new Map(); // cardId -> state
   var cardIdCounter = 0;
   var observerRoot = null;
@@ -87,6 +99,9 @@
         date: scraped.date,
         statedPercent: scraped.statedPercent,
         currentPercent: initialPercent,
+        quantityBlockEl: scraped.quantityBlockEl,
+        quantityValueEl: scraped.quantityValueEl,
+        percentInputEl: null,
         status: 'loading', // 'loading' | 'ready' | 'error'
         quote: null,
         fx: null,
@@ -94,14 +109,23 @@
       };
       cardStates.set(cardId, state);
 
+      makeQuantityFieldEditable(state); // turns the site's own "Количество" row into an input, if found
+
       var body = TPS.scrape.getCardBody(cardEl);
-      if (!body) return;
-      var block = buildSizingBlockDom(state);
-      body.appendChild(block);
+      if (body) {
+        var group = buildFieldsGroup(state);
+        body.appendChild(group);
+        if (!state.percentInputEl) {
+          // Fallback: the "Количество" row wasn't found (unexpected markup) — the
+          // fields group itself included a percent input so editing still works.
+          state.percentInputEl = group.querySelector('.tps-percent-input');
+        }
+      }
+
       bindPercentInputHandler(cardId);
 
       if (!settings.accountBalance) {
-        setBlockHint(cardId, 'Задайте наличност по сметка в настройките на добавката.');
+        setMeta(cardId, 'hint', 'Задайте наличност по сметка в настройките на добавката.');
       }
 
       loadPriceAndRender(cardId);
@@ -166,45 +190,95 @@
     });
   }
 
-  // ---------- rendering ----------
+  // ---------- DOM building ----------
 
-  function buildSizingBlockDom(state) {
-    var block = document.createElement('div');
-    block.className = 'tps-sizing-block tps-state-loading';
-    block.setAttribute('data-tps-block-for', state.cardId);
-
-    block.innerHTML =
-      '<div class="tps-row"><span class="tps-label">Цена / бр.</span><span class="tps-value tps-price-value">…</span></div>' +
-      '<div class="tps-row"><label class="tps-label" for="tps-percent-input-' + state.cardId + '">Позиция %</label>' +
-        '<input id="tps-percent-input-' + state.cardId + '" class="tps-percent-input" type="number" min="0" max="100" step="0.1" value="' + state.currentPercent + '"></div>' +
-      '<div class="tps-row"><span class="tps-label">Брой акции</span><span class="tps-value tps-shares-value">—</span></div>' +
-      '<div class="tps-row"><span class="tps-label">Сума (валута на акцията)</span><span class="tps-value tps-total-position-value">—</span></div>' +
-      '<div class="tps-row"><span class="tps-label">Сума (моята валута)</span><span class="tps-value tps-total-account-value">—</span></div>' +
-      '<div class="tps-source-badge" hidden></div>' +
-      '<div class="tps-hint-message" hidden></div>' +
-      '<div class="tps-error-message" hidden></div>';
-
-    return block;
+  function markerHtml(title, glyph) {
+    return '<span class="tps-marker" title="' + escapeAttr(title) + '">' + glyph + '</span>';
   }
 
-  function getBlockEl(cardId) {
+  function escapeAttr(text) {
+    return String(text).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  }
+
+  function fieldRowHtml(fieldKey, label, valueHtml, extraClass, hiddenByDefault) {
+    return '<div class="t09_bl tps-field' + (extraClass ? ' ' + extraClass : '') + '" data-tps-field="' + fieldKey + '"' + (hiddenByDefault ? ' hidden' : '') + '>' +
+      '<p class="lbl">' + label + '</p>' +
+      '<p class="val">' + valueHtml + '</p>' +
+      '</div>';
+  }
+
+  // Turns the site's own "Количество" (position size %) field into a live input,
+  // instead of adding a separate row — the most native-feeling place for it to live,
+  // since it's literally the field that already shows the position size.
+  function makeQuantityFieldEditable(state) {
+    var blockEl = state.quantityBlockEl;
+    var valueEl = state.quantityValueEl;
+    if (!blockEl || !valueEl) return;
+    blockEl.classList.add('tps-field', 'tps-field-editable');
+    var lblEl = blockEl.querySelector('.lbl');
+    if (lblEl && !lblEl.querySelector('.tps-marker')) {
+      lblEl.insertAdjacentHTML('beforeend', ' ' + markerHtml(TOOLTIP_EDITABLE, '✎'));
+    }
+    valueEl.innerHTML = '<input class="tps-percent-input" type="number" min="0" max="100" step="0.1" value="' + state.currentPercent + '">%';
+    state.percentInputEl = valueEl.querySelector('.tps-percent-input');
+  }
+
+  function buildFieldsGroup(state) {
+    var wrapper = document.createElement('div');
+    wrapper.className = 'tps-fields-group';
+    wrapper.setAttribute('data-tps-block-for', state.cardId);
+
+    var html = fieldRowHtml(
+      'header',
+      markerHtml(TOOLTIP_ADDED, '⚡') + ' Изчислено от Position Sizer',
+      '',
+      'tps-field-header'
+    );
+
+    if (!state.percentInputEl) {
+      // Fallback path — see processCard(): only used if the site's "Количество" row wasn't found.
+      html += fieldRowHtml('percent', 'Позиция %',
+        '<input class="tps-percent-input" type="number" min="0" max="100" step="0.1" value="' + state.currentPercent + '">%');
+    }
+
+    html += fieldRowHtml('price', 'Цена / бр.', '<span class="tps-price-value">…</span>');
+    html += fieldRowHtml('shares', 'Брой акции', '<span class="tps-shares-value">—</span>');
+    html += fieldRowHtml('total-position', 'Сума (вал. на акцията)', '<span class="tps-total-position-value">—</span>');
+    html += fieldRowHtml('total-account', 'Сума (моята валута)', '<span class="tps-total-account-value">—</span>');
+    html += fieldRowHtml('meta', 'Инфо', '<span class="tps-meta-value">—</span>', 'tps-field-meta', true);
+
+    wrapper.innerHTML = html;
+    return wrapper;
+  }
+
+  function getGroupEl(cardId) {
     var state = cardStates.get(cardId);
     if (!state || !state.cardEl) return null;
     return state.cardEl.querySelector('[data-tps-block-for="' + cardId + '"]');
   }
 
-  function setBlockHint(cardId, text) {
-    var block = getBlockEl(cardId);
-    if (!block) return;
-    var hintEl = block.querySelector('.tps-hint-message');
-    hintEl.textContent = text;
-    hintEl.hidden = !text;
+  function setMeta(cardId, kind, text) {
+    var group = getGroupEl(cardId);
+    if (!group) return;
+    var metaRow = group.querySelector('[data-tps-field="meta"]');
+    var metaValueEl = group.querySelector('.tps-meta-value');
+    if (!metaRow || !metaValueEl) return;
+    if (!text) {
+      metaRow.hidden = true;
+      return;
+    }
+    metaValueEl.textContent = text;
+    metaRow.hidden = false;
+    metaRow.classList.remove('tps-meta-hint', 'tps-meta-error', 'tps-meta-badge');
+    metaRow.classList.add('tps-meta-' + kind);
   }
+
+  // ---------- rendering ----------
 
   function renderCardResult(cardId) {
     var state = cardStates.get(cardId);
-    var block = getBlockEl(cardId);
-    if (!state || !block || !state.quote || !state.fx) return;
+    var group = getGroupEl(cardId);
+    if (!state || !group || !state.quote || !state.fx) return;
 
     TPS.storage.getSettings().then(function (settings) {
       var result = TPS.sizing.computePositionSize({
@@ -216,55 +290,45 @@
         roundUpThresholdAmount: settings.roundUpThresholdAmount
       });
 
-      block.className = 'tps-sizing-block tps-state-ready';
-      block.querySelector('.tps-price-value').textContent = TPS.format.formatMoney(state.quote.price, state.quote.currency);
-      block.querySelector('.tps-shares-value').textContent = TPS.format.formatShares(result.shares, settings.roundingMode);
-      block.querySelector('.tps-total-position-value').textContent = TPS.format.formatMoney(result.totalPositionCurrency, state.quote.currency);
-      block.querySelector('.tps-total-account-value').textContent = TPS.format.formatMoney(result.totalAccountCurrency, settings.accountCurrency);
+      group.querySelector('.tps-price-value').textContent = TPS.format.formatMoney(state.quote.price, state.quote.currency);
+      group.querySelector('.tps-shares-value').textContent = TPS.format.formatShares(result.shares, settings.roundingMode);
+      group.querySelector('.tps-total-position-value').textContent = TPS.format.formatMoney(result.totalPositionCurrency, state.quote.currency);
+      group.querySelector('.tps-total-account-value').textContent = TPS.format.formatMoney(result.totalAccountCurrency, settings.accountCurrency);
 
-      var errorEl = block.querySelector('.tps-error-message');
-      errorEl.hidden = true;
-
-      var badgeEl = block.querySelector('.tps-source-badge');
       var badgeParts = [];
       if (state.quote.source !== 'yahoo') badgeParts.push('цена: ' + state.quote.source + ' (прибл.)');
       if (state.fx.source && state.fx.source !== 'yahoo' && state.fx.source !== 'identity') badgeParts.push('курс: ' + state.fx.source);
-      if (badgeParts.length) {
-        badgeEl.textContent = badgeParts.join(' · ');
-        badgeEl.hidden = false;
-      } else {
-        badgeEl.hidden = true;
-      }
 
-      setBlockHint(cardId, settings.accountBalance ? '' : 'Задайте наличност по сметка в настройките на добавката.');
+      if (!settings.accountBalance) {
+        setMeta(cardId, 'hint', 'Задайте наличност по сметка в настройките на добавката.');
+      } else if (badgeParts.length) {
+        setMeta(cardId, 'badge', badgeParts.join(' · '));
+      } else {
+        setMeta(cardId, null, '');
+      }
     });
   }
 
   function renderCardError(cardId, message) {
-    var block = getBlockEl(cardId);
-    if (!block) return;
-    block.className = 'tps-sizing-block tps-state-error';
-    var errorEl = block.querySelector('.tps-error-message');
-    errorEl.textContent = 'Грешка: ' + message;
-    errorEl.hidden = false;
+    setMeta(cardId, 'error', 'Грешка: ' + message);
   }
 
   // ---------- percent editing ----------
 
   function bindPercentInputHandler(cardId) {
-    var block = getBlockEl(cardId);
-    if (!block) return;
-    var input = block.querySelector('.tps-percent-input');
+    var state = cardStates.get(cardId);
+    if (!state || !state.percentInputEl) return;
+    var input = state.percentInputEl;
     var debounceTimer = null;
     input.addEventListener('input', function () {
       var value = parseFloat(input.value);
       if (!isFinite(value)) return;
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(function () {
-        var state = cardStates.get(cardId);
-        if (!state) return;
-        state.currentPercent = value;
-        if (state.status === 'ready') renderCardResult(cardId);
+        var s = cardStates.get(cardId);
+        if (!s) return;
+        s.currentPercent = value;
+        if (s.status === 'ready') renderCardResult(cardId);
       }, 150);
     });
   }

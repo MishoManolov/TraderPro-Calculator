@@ -6,13 +6,12 @@ An unofficial Chrome extension (Manifest V3) that adds live position-sizing math
 
 ## What it does
 
-For every **buy** ("КУПУВА" / open-position) signal card on the TraderPRO signals page, the extension injects a small block showing:
+For every **buy** ("КУПУВА" / open-position) signal card on the TraderPRO signals page, the extension adds:
 
-- Current price per share
-- An editable position-size % (defaults to the % stated on the signal, e.g. "20%")
-- The resulting share count, per your chosen rounding mode
-- Total cost in the stock's own trading currency
-- Total cost converted into your account currency
+- Its existing "Количество" (position size %) field becomes directly editable in place — click it and type a new %.
+- A few extra rows appended right below the existing ones, styled like every other field on the card (same fonts/spacing) so they read as a natural part of it rather than a bolted-on box: current price per share, the resulting share count (per your chosen rounding mode), total cost in the stock's own trading currency, and total cost converted into your account currency.
+
+Since these rows aren't part of the original signal, they're still easy to tell apart from TraderPRO's own content: a small "⚡ Изчислено от Position Sizer" header introduces them, each has a thin accent-colored bar along its left edge, and the editable % field carries a small "✎" marker — hover any of these for a tooltip explaining it's extension-added.
 
 The same information is also available in the extension's popup (click the toolbar icon) for a quick summary without scrolling through the page.
 
@@ -26,11 +25,17 @@ Sell/close-position signals ("ПРОДАВА") are left untouched — they don't
 4. Click the extension's icon → **Настройки** (Settings) to open the Options page and configure your account balance/currency and rounding preferences (see below). Everything defaults to sensible placeholders (0 balance, USD, round-down) if you skip this.
 5. Log into `login.traderpro.bg` and open the strategy/signals page — buy-signal cards should now show live pricing and share counts.
 
+## Editing your account balance
+
+Since your available balance changes often, it doesn't live behind the Options page — **click the toolbar icon and the balance field is right there, auto-focused and ready to type into.** Type a new number, click away (or just stop typing), and it saves automatically (debounced ~300ms, with a small ✓ confirming the save) and instantly recomputes every share count/total both in the popup and on the TraderPRO page itself. One click to open the popup is all it takes.
+
+The account currency, position-sizing mode, and rounding mode change far less often, so those stay on the Options page (click **Настройки** in the popup, or right-click the toolbar icon → Options).
+
 ## Configuring (Options page)
 
 | Setting | What it does |
 |---|---|
-| **Account balance / currency** | Your available capital and the currency it's denominated in. Manually entered — there is no live brokerage connection yet (see Roadmap). |
+| **Account balance / currency** | Your available capital and the currency it's denominated in. Manually entered — there is no live brokerage connection yet (see Roadmap). The balance itself can also be edited directly from the popup, see above. |
 | **Position sizing mode** | *Use each signal's stated %* (default) or *Override all with a fixed %* — e.g. always size every position at 10% regardless of what the signal says. You can still hand-edit any individual card's % afterward regardless of this setting. |
 | **Rounding mode** | See below. |
 

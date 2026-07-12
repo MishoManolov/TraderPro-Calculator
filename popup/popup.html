@@ -8,9 +8,14 @@
 <body>
   <div class="tps-popup">
     <header class="tps-popup-header">
-      <div>
+      <div class="tps-header-main">
         <strong>TraderPRO Position Sizer</strong>
-        <div id="balanceSummary" class="tps-balance-summary">—</div>
+        <div class="tps-balance-edit">
+          <label for="accountBalanceInput" class="tps-balance-edit-label">Наличност</label>
+          <span id="balanceCurrencyPrefix" class="tps-currency-prefix">$</span>
+          <input id="accountBalanceInput" class="tps-balance-input" type="number" min="0" step="0.01" inputmode="decimal">
+          <span id="balanceSavedIndicator" class="tps-saved-indicator" hidden>✓</span>
+        </div>
       </div>
       <button id="openOptionsBtn" class="tps-link-btn" type="button">Настройки</button>
     </header>
