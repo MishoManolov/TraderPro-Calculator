@@ -1,16 +1,12 @@
 // options/options.js
 (function () {
   var els = {
-    accountBalance: document.getElementById('accountBalance'),
     accountCurrency: document.getElementById('accountCurrency'),
-    fixedPercent: document.getElementById('fixedPercent'),
-    fixedPercentRow: document.getElementById('fixedPercentRow'),
     roundUpThresholdAmount: document.getElementById('roundUpThresholdAmount'),
     thresholdRow: document.getElementById('thresholdRow'),
     saveStatus: document.getElementById('saveStatus')
   };
 
-  var positionSizingRadios = document.querySelectorAll('input[name="positionSizingMode"]');
   var roundingRadios = document.querySelectorAll('input[name="roundingMode"]');
 
   var saveTimer = null;
@@ -42,28 +38,25 @@
   }
 
   function updateConditionalVisibility() {
-    els.fixedPercentRow.hidden = getRadioValue(positionSizingRadios) !== 'fixed';
     els.thresholdRow.hidden = getRadioValue(roundingRadios) !== 'roundUpThreshold';
   }
 
   function populateForm(settings) {
     isPopulating = true;
-    els.accountBalance.value = settings.accountBalance;
     els.accountCurrency.value = settings.accountCurrency;
-    setRadioValue(positionSizingRadios, settings.positionSizingMode);
-    els.fixedPercent.value = settings.fixedPercent;
     setRadioValue(roundingRadios, settings.roundingMode);
     els.roundUpThresholdAmount.value = settings.roundUpThresholdAmount;
     updateConditionalVisibility();
     isPopulating = false;
   }
 
+  // Deliberately omits accountBalance — it's edited only in the popup now (see
+  // popup/popup.js). TPS.storage.setSettings() merges partial updates onto the
+  // existing stored settings, so leaving it out here preserves whatever the
+  // popup last saved instead of resetting it.
   function readFormAsPartialSettings() {
     return {
-      accountBalance: parseFloat(els.accountBalance.value) || 0,
       accountCurrency: els.accountCurrency.value,
-      positionSizingMode: getRadioValue(positionSizingRadios) || 'signal',
-      fixedPercent: parseFloat(els.fixedPercent.value) || 0,
       roundingMode: getRadioValue(roundingRadios) || 'roundDown',
       roundUpThresholdAmount: parseFloat(els.roundUpThresholdAmount.value) || 0
     };
@@ -87,12 +80,11 @@
   }
 
   function bindFormListeners() {
-    var inputs = [els.accountBalance, els.accountCurrency, els.fixedPercent, els.roundUpThresholdAmount];
+    var inputs = [els.accountCurrency, els.roundUpThresholdAmount];
     inputs.forEach(function (el) {
       el.addEventListener('input', scheduleSave);
       el.addEventListener('change', scheduleSave);
     });
-    positionSizingRadios.forEach(function (el) { el.addEventListener('change', scheduleSave); });
     roundingRadios.forEach(function (el) { el.addEventListener('change', scheduleSave); });
   }
 

@@ -13,12 +13,14 @@
     accountBalanceInput: document.getElementById('accountBalanceInput'),
     balanceCurrencyPrefix: document.getElementById('balanceCurrencyPrefix'),
     balanceSavedIndicator: document.getElementById('balanceSavedIndicator'),
+    positionPercentInput: document.getElementById('positionPercentInput'),
+    percentSavedIndicator: document.getElementById('percentSavedIndicator'),
     emptyState: document.getElementById('emptyState'),
     signalsList: document.getElementById('signalsList'),
     openOptionsBtn: document.getElementById('openOptionsBtn')
   };
 
-  var renderedItems = []; // {item, state} for every signal currently rendered, so a balance edit can re-render them all
+  var renderedItems = []; // {item, state} for every signal currently rendered, so a balance/% edit can re-render them all
 
   els.openOptionsBtn.addEventListener('click', function () {
     chrome.runtime.openOptionsPage();
@@ -53,6 +55,40 @@
     // Single click to open the popup is enough to start editing — no extra click needed.
     els.accountBalanceInput.focus();
     els.accountBalanceInput.select();
+  }
+
+  // The one global position-size override, applied to every signal — see
+  // TPS.sizing.resolveEffectivePercent(). Left empty, each signal uses its own
+  // TraderPRO-stated %; a number here overrides all of them uniformly. No
+  // per-signal override exists anymore (deliberately removed).
+  function bindPositionPercentInput(settings) {
+    if (settings.positionPercentOverride !== null && settings.positionPercentOverride !== undefined) {
+      els.positionPercentInput.value = settings.positionPercentOverride;
+    }
+
+    var saveTimer = null;
+    var indicatorTimer = null;
+
+    els.positionPercentInput.addEventListener('input', function () {
+      var raw = els.positionPercentInput.value.trim();
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(function () {
+        var value = raw === '' ? null : parseFloat(raw);
+        if (value !== null && !isFinite(value)) return;
+        settings.positionPercentOverride = value; // shared reference
+        TPS.storage.setSettings({ positionPercentOverride: value }).then(function () {
+          els.percentSavedIndicator.hidden = false;
+          if (indicatorTimer) clearTimeout(indicatorTimer);
+          indicatorTimer = setTimeout(function () {
+            els.percentSavedIndicator.hidden = true;
+          }, 1200);
+        });
+        renderedItems.forEach(function (entry) {
+          updatePercentDisplay(entry.item, entry.state, settings);
+          renderResult(entry.item, entry.state, settings);
+        });
+      }, 300);
+    });
   }
 
   function getActiveTab() {
@@ -90,22 +126,18 @@
   function buildSignalItem(signal, settings) {
     var li = document.createElement('li');
     li.className = 'tps-signal-item';
-    var initialPercent = settings.positionSizingMode === 'fixed'
-      ? settings.fixedPercent
-      : (typeof signal.currentPercent === 'number' ? signal.currentPercent : signal.statedPercent);
+    var effectivePercent = TPS.sizing.resolveEffectivePercent(signal.statedPercent, settings.positionPercentOverride);
 
     li.innerHTML =
       '<div class="tps-signal-title"><span class="tps-signal-ticker">' + escapeHtml(signal.ticker) + '</span>' +
         '<span>' + escapeHtml(signal.instrument || '') + '</span></div>' +
       '<div class="tps-row"><span class="tps-label">Цена / бр.</span><span class="tps-value tps-price-value">…</span></div>' +
-      '<div class="tps-row"><span class="tps-label">Позиция %</span>' +
-        '<input class="tps-percent-input" type="number" min="0" max="100" step="0.1" value="' + initialPercent + '"></div>' +
+      '<div class="tps-row"><span class="tps-label">Позиция %</span><span class="tps-value tps-percent-value">' + TPS.format.formatPercent(effectivePercent) + '</span></div>' +
       '<div class="tps-row"><span class="tps-label">Брой акции</span><span class="tps-value tps-shares-value">—</span></div>' +
       '<div class="tps-row"><span class="tps-label">Сума (моята валута)</span><span class="tps-value tps-total-account-value">—</span></div>' +
       '<div class="tps-source-badge" hidden></div>' +
       '<div class="tps-error-message" hidden></div>';
 
-    li.dataset.percent = String(initialPercent);
     return li;
   }
 
@@ -115,8 +147,14 @@
     return div.innerHTML;
   }
 
+  function updatePercentDisplay(item, state, settings) {
+    var el = item.querySelector('.tps-percent-value');
+    if (!el) return;
+    el.textContent = TPS.format.formatPercent(TPS.sizing.resolveEffectivePercent(state.statedPercent, settings.positionPercentOverride));
+  }
+
   function loadAndRenderSignal(item, signal, settings) {
-    var state = { quote: null, fx: null };
+    var state = { quote: null, fx: null, statedPercent: signal.statedPercent };
     renderedItems.push({ item: item, state: state });
 
     TPS.messaging.requestQuote(signal.ticker).then(function (quoteResponse) {
@@ -130,7 +168,6 @@
     }).then(function (fx) {
       state.fx = fx;
       renderResult(item, state, settings);
-      bindPercentInput(item, state, settings);
     }).catch(function (err) {
       var errorEl = item.querySelector('.tps-error-message');
       errorEl.textContent = 'Грешка: ' + String((err && err.message) || err);
@@ -138,32 +175,19 @@
     });
   }
 
-  function bindPercentInput(item, state, settings) {
-    var input = item.querySelector('.tps-percent-input');
-    var timer = null;
-    input.addEventListener('input', function () {
-      var value = parseFloat(input.value);
-      if (!isFinite(value)) return;
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(function () {
-        item.dataset.percent = String(value);
-        renderResult(item, state, settings);
-      }, 150);
-    });
-  }
-
   function renderResult(item, state, settings) {
     if (!state.quote || !state.fx) return;
-    var percent = parseFloat(item.dataset.percent) || 0;
+    var effectivePercent = TPS.sizing.resolveEffectivePercent(state.statedPercent, settings.positionPercentOverride);
     var result = TPS.sizing.computePositionSize({
       accountBalance: settings.accountBalance,
-      percent: percent,
+      percent: effectivePercent,
       priceInPositionCurrency: state.quote.price,
       fxRate: state.fx.rate,
       roundingMode: settings.roundingMode,
       roundUpThresholdAmount: settings.roundUpThresholdAmount
     });
 
+    item.querySelector('.tps-percent-value').textContent = TPS.format.formatPercent(effectivePercent);
     item.querySelector('.tps-price-value').textContent = TPS.format.formatMoney(state.quote.price, state.quote.currency);
     item.querySelector('.tps-shares-value').textContent = TPS.format.formatShares(result.shares, settings.roundingMode);
     item.querySelector('.tps-total-account-value').textContent = TPS.format.formatMoney(result.totalAccountCurrency, settings.accountCurrency);
@@ -179,6 +203,7 @@
   function init() {
     TPS.storage.getSettings().then(function (settings) {
       bindBalanceInput(settings);
+      bindPositionPercentInput(settings);
 
       getActiveTab().then(function (tab) {
         if (!tab || !tab.id) {

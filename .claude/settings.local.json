@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "PowerShell(Get-Command node -ErrorAction SilentlyContinue)",
-      "PowerShell(Get-Command node.exe -ErrorAction SilentlyContinue)"
+      "PowerShell(Get-Command node.exe -ErrorAction SilentlyContinue)",
+      "Bash(python3 -c ' *)"
     ]
   }
 }

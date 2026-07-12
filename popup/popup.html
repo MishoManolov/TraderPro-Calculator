@@ -16,6 +16,11 @@
           <input id="accountBalanceInput" class="tps-balance-input" type="number" min="0" step="0.01" inputmode="decimal">
           <span id="balanceSavedIndicator" class="tps-saved-indicator" hidden>✓</span>
         </div>
+        <div class="tps-balance-edit" title="Празно = използва се % от сигнала на TraderPRO за всяка позиция. Число тук = използва се за всички позиции вместо това.">
+          <label for="positionPercentInput" class="tps-balance-edit-label">Позиция %</label>
+          <input id="positionPercentInput" class="tps-balance-input tps-percent-override-input" type="number" min="0" max="100" step="0.1" placeholder="от сигнала">
+          <span id="percentSavedIndicator" class="tps-saved-indicator" hidden>✓</span>
+        </div>
       </div>
       <button id="openOptionsBtn" class="tps-link-btn" type="button">Настройки</button>
     </header>

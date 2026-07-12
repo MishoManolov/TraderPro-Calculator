@@ -3,13 +3,21 @@
 (function (global) {
   global.TPS = global.TPS || {};
 
+  function describeError(err) {
+    return (err && err.message) || String(err);
+  }
+
   /**
    * @param {string} ticker
    * @returns {Promise<{ticker:string, price:number, currency:string, source:'yahoo'|'stooq', asOf:string}>}
    */
   function fetchQuote(ticker) {
-    return fetchQuoteYahoo(ticker).catch(function () {
-      return fetchQuoteStooq(ticker);
+    return fetchQuoteYahoo(ticker).catch(function (yahooErr) {
+      return fetchQuoteStooq(ticker).catch(function (stooqErr) {
+        // Surface both underlying errors — swallowing Yahoo's and only showing
+        // Stooq's made "everything is failing" undiagnosable from the UI alone.
+        throw new Error('Yahoo: ' + describeError(yahooErr) + ' | Stooq: ' + describeError(stooqErr));
+      });
     });
   }
 

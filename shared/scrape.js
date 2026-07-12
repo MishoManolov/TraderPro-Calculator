@@ -28,17 +28,14 @@
 
   /**
    * @param {Element} cardEl
-   * @returns {{ticker:string, instrument:string, exchange:string, date:string, statedPercent:number,
-   *            quantityBlockEl:Element|null, quantityValueEl:Element|null}|null}
+   * @returns {{ticker:string, instrument:string, exchange:string, date:string, statedPercent:number}|null}
    *          null if ticker is missing (malformed card — caller should skip it, not break the page).
-   *          quantityBlockEl/quantityValueEl point at the site's own "Количество" row so the
-   *          injected UI can turn that existing field editable in place instead of appending a
-   *          separate one — see content.js.
+   *          The site's own "Количество" field is read here for its stated % but is never
+   *          modified by the extension — there is no per-signal override, only a global
+   *          one in settings.positionPercentOverride. See TPS.sizing.resolveEffectivePercent().
    */
   function scrapeCard(cardEl) {
     var fields = {};
-    var quantityBlockEl = null;
-    var quantityValueEl = null;
     var blocks = cardEl.querySelectorAll(BLOCK_SELECTOR);
     for (var i = 0; i < blocks.length; i++) {
       var block = blocks[i];
@@ -50,11 +47,7 @@
       else if (lbl === LABELS.instrument) fields.instrument = val;
       else if (lbl === LABELS.exchange) fields.exchange = val;
       else if (lbl === LABELS.ticker) fields.ticker = val;
-      else if (lbl === LABELS.quantityPercent) {
-        fields.statedPercentRaw = val;
-        quantityBlockEl = block;
-        quantityValueEl = valEl;
-      }
+      else if (lbl === LABELS.quantityPercent) fields.statedPercentRaw = val;
     }
     if (!fields.ticker) return null;
     return {
@@ -62,9 +55,7 @@
       instrument: fields.instrument || '',
       exchange: fields.exchange || '',
       date: fields.date || '',
-      statedPercent: parsePercent(fields.statedPercentRaw),
-      quantityBlockEl: quantityBlockEl,
-      quantityValueEl: quantityValueEl
+      statedPercent: parsePercent(fields.statedPercentRaw)
     };
   }
 

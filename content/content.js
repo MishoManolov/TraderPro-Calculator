@@ -1,17 +1,16 @@
 // content/content.js — card discovery, injection, live pricing, MutationObserver
 //
-// Injection philosophy: new/changed values are rendered as ordinary ".t09_bl" rows
+// Injection philosophy: appended values are rendered as ordinary ".t09_bl" rows
 // (the same label/value block the site itself uses for every other field), so they
 // inherit the site's own typography/spacing and read as a natural continuation of
-// the card — not a bolted-on box. To still make clear this content isn't part of the
-// original signal: (1) a single small header row introduces the appended section,
-// (2) every extension-touched row (including the "Количество" field, which is turned
-// into an editable input in place rather than duplicated) carries a thin accent bar
-// and a marker icon with an explanatory tooltip on hover.
+// the card. The site's own "Количество" field is left completely untouched.
+//
+// Position sizing is NOT per-signal: there is a single global % override
+// (settings.positionPercentOverride, configured once in the popup next to the
+// account balance). Each card shows the resulting effective % as a static value
+// (TPS.sizing.resolveEffectivePercent) — not an editable input — so all cards
+// always agree with whatever's currently configured globally.
 (function () {
-  var TOOLTIP_ADDED = 'Добавено от разширението TraderPRO Position Sizer — не е част от оригиналния сигнал';
-  var TOOLTIP_EDITABLE = 'Стойността може да се редактира — добавено от TraderPRO Position Sizer';
-
   var cardStates = new Map(); // cardId -> state
   var cardIdCounter = 0;
   var observerRoot = null;
@@ -89,7 +88,6 @@
     if (!scraped) return; // malformed card — skip silently, don't break the page
 
     TPS.storage.getSettings().then(function (settings) {
-      var initialPercent = settings.positionSizingMode === 'fixed' ? settings.fixedPercent : scraped.statedPercent;
       var state = {
         cardId: cardId,
         cardEl: cardEl,
@@ -98,10 +96,6 @@
         exchange: scraped.exchange,
         date: scraped.date,
         statedPercent: scraped.statedPercent,
-        currentPercent: initialPercent,
-        quantityBlockEl: scraped.quantityBlockEl,
-        quantityValueEl: scraped.quantityValueEl,
-        percentInputEl: null,
         status: 'loading', // 'loading' | 'ready' | 'error'
         quote: null,
         fx: null,
@@ -109,23 +103,14 @@
       };
       cardStates.set(cardId, state);
 
-      makeQuantityFieldEditable(state); // turns the site's own "Количество" row into an input, if found
-
       var body = TPS.scrape.getCardBody(cardEl);
       if (body) {
-        var group = buildFieldsGroup(state);
+        var group = buildFieldsGroup(state, settings);
         body.appendChild(group);
-        if (!state.percentInputEl) {
-          // Fallback: the "Количество" row wasn't found (unexpected markup) — the
-          // fields group itself included a percent input so editing still works.
-          state.percentInputEl = group.querySelector('.tps-percent-input');
-        }
       }
 
-      bindPercentInputHandler(cardId);
-
       if (!settings.accountBalance) {
-        setMeta(cardId, 'hint', 'Задайте наличност по сметка в настройките на добавката.');
+        setMeta(cardId, 'hint', 'Задайте наличност по сметка в изскачащия прозорец на добавката.');
       }
 
       loadPriceAndRender(cardId);
@@ -192,55 +177,27 @@
 
   // ---------- DOM building ----------
 
-  function markerHtml(title, glyph) {
-    return '<span class="tps-marker" title="' + escapeAttr(title) + '">' + glyph + '</span>';
-  }
-
-  function escapeAttr(text) {
-    return String(text).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-  }
-
   function fieldRowHtml(fieldKey, label, valueHtml, extraClass, hiddenByDefault) {
-    return '<div class="t09_bl tps-field' + (extraClass ? ' ' + extraClass : '') + '" data-tps-field="' + fieldKey + '"' + (hiddenByDefault ? ' hidden' : '') + '>' +
+    return '<div class="t09_bl' + (extraClass ? ' ' + extraClass : '') + '" data-tps-field="' + fieldKey + '"' + (hiddenByDefault ? ' hidden' : '') + '>' +
       '<p class="lbl">' + label + '</p>' +
       '<p class="val">' + valueHtml + '</p>' +
       '</div>';
   }
 
-  // Turns the site's own "Количество" (position size %) field into a live input,
-  // instead of adding a separate row — the most native-feeling place for it to live,
-  // since it's literally the field that already shows the position size.
-  function makeQuantityFieldEditable(state) {
-    var blockEl = state.quantityBlockEl;
-    var valueEl = state.quantityValueEl;
-    if (!blockEl || !valueEl) return;
-    blockEl.classList.add('tps-field', 'tps-field-editable');
-    var lblEl = blockEl.querySelector('.lbl');
-    if (lblEl && !lblEl.querySelector('.tps-marker')) {
-      lblEl.insertAdjacentHTML('beforeend', ' ' + markerHtml(TOOLTIP_EDITABLE, '✎'));
-    }
-    valueEl.innerHTML = '<input class="tps-percent-input" type="number" min="0" max="100" step="0.1" value="' + state.currentPercent + '">%';
-    state.percentInputEl = valueEl.querySelector('.tps-percent-input');
-  }
-
-  function buildFieldsGroup(state) {
+  // Appended fields are plain .t09_bl cells like every native field (label over
+  // value), preceded by a single full-width divider (.tps-divider) that separates
+  // them from the card's native fields — see content.css for why per-cell borders
+  // were dropped in favor of this one line.
+  function buildFieldsGroup(state, settings) {
     var wrapper = document.createElement('div');
     wrapper.className = 'tps-fields-group';
     wrapper.setAttribute('data-tps-block-for', state.cardId);
 
-    var html = fieldRowHtml(
-      'header',
-      markerHtml(TOOLTIP_ADDED, '⚡') + ' Изчислено от Position Sizer',
-      '',
-      'tps-field-header'
-    );
+    var effectivePercent = TPS.sizing.resolveEffectivePercent(state.statedPercent, settings.positionPercentOverride);
 
-    if (!state.percentInputEl) {
-      // Fallback path — see processCard(): only used if the site's "Количество" row wasn't found.
-      html += fieldRowHtml('percent', 'Позиция %',
-        '<input class="tps-percent-input" type="number" min="0" max="100" step="0.1" value="' + state.currentPercent + '">%');
-    }
+    var html = '<div class="tps-divider"></div>';
 
+    html += fieldRowHtml('percent', 'Позиция %', '<span class="tps-percent-value">' + TPS.format.formatPercent(effectivePercent) + '</span>');
     html += fieldRowHtml('price', 'Цена / бр.', '<span class="tps-price-value">…</span>');
     html += fieldRowHtml('shares', 'Брой акции', '<span class="tps-shares-value">—</span>');
     html += fieldRowHtml('total-position', 'Сума (вал. на акцията)', '<span class="tps-total-position-value">—</span>');
@@ -281,15 +238,17 @@
     if (!state || !group || !state.quote || !state.fx) return;
 
     TPS.storage.getSettings().then(function (settings) {
+      var effectivePercent = TPS.sizing.resolveEffectivePercent(state.statedPercent, settings.positionPercentOverride);
       var result = TPS.sizing.computePositionSize({
         accountBalance: settings.accountBalance,
-        percent: state.currentPercent,
+        percent: effectivePercent,
         priceInPositionCurrency: state.quote.price,
         fxRate: state.fx.rate,
         roundingMode: settings.roundingMode,
         roundUpThresholdAmount: settings.roundUpThresholdAmount
       });
 
+      group.querySelector('.tps-percent-value').textContent = TPS.format.formatPercent(effectivePercent);
       group.querySelector('.tps-price-value').textContent = TPS.format.formatMoney(state.quote.price, state.quote.currency);
       group.querySelector('.tps-shares-value').textContent = TPS.format.formatShares(result.shares, settings.roundingMode);
       group.querySelector('.tps-total-position-value').textContent = TPS.format.formatMoney(result.totalPositionCurrency, state.quote.currency);
@@ -300,7 +259,7 @@
       if (state.fx.source && state.fx.source !== 'yahoo' && state.fx.source !== 'identity') badgeParts.push('курс: ' + state.fx.source);
 
       if (!settings.accountBalance) {
-        setMeta(cardId, 'hint', 'Задайте наличност по сметка в настройките на добавката.');
+        setMeta(cardId, 'hint', 'Задайте наличност по сметка в изскачащия прозорец на добавката.');
       } else if (badgeParts.length) {
         setMeta(cardId, 'badge', badgeParts.join(' · '));
       } else {
@@ -313,31 +272,24 @@
     setMeta(cardId, 'error', 'Грешка: ' + message);
   }
 
-  // ---------- percent editing ----------
-
-  function bindPercentInputHandler(cardId) {
-    var state = cardStates.get(cardId);
-    if (!state || !state.percentInputEl) return;
-    var input = state.percentInputEl;
-    var debounceTimer = null;
-    input.addEventListener('input', function () {
-      var value = parseFloat(input.value);
-      if (!isFinite(value)) return;
-      if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(function () {
-        var s = cardStates.get(cardId);
-        if (!s) return;
-        s.currentPercent = value;
-        if (s.status === 'ready') renderCardResult(cardId);
-      }, 150);
-    });
-  }
-
   // ---------- settings reactivity ----------
 
   function handleSettingsChanged(newSettings, oldSettings) {
     var currencyChanged = newSettings.accountCurrency !== oldSettings.accountCurrency;
+    var percentChanged = newSettings.positionPercentOverride !== oldSettings.positionPercentOverride;
+
     cardStates.forEach(function (state, cardId) {
+      // The static "Позиция %" value must reflect the new global override even
+      // for cards still loading/errored (not just 'ready' ones).
+      if (percentChanged) {
+        var group = getGroupEl(cardId);
+        var percentEl = group && group.querySelector('.tps-percent-value');
+        if (percentEl) {
+          percentEl.textContent = TPS.format.formatPercent(
+            TPS.sizing.resolveEffectivePercent(state.statedPercent, newSettings.positionPercentOverride)
+          );
+        }
+      }
       if (state.status !== 'ready') return;
       if (currencyChanged) {
         loadFxOnly(cardId);
@@ -359,8 +311,7 @@
           instrument: state.instrument,
           exchange: state.exchange,
           date: state.date,
-          statedPercent: state.statedPercent,
-          currentPercent: state.currentPercent
+          statedPercent: state.statedPercent
         });
       });
       sendResponse({ ok: true, data: data });

@@ -12,8 +12,12 @@
     schemaVersion: SCHEMA_VERSION,
     accountBalance: 0,
     accountCurrency: 'USD',
-    positionSizingMode: 'signal', // 'signal' | 'fixed'
-    fixedPercent: 10,
+    // Global position-size override, applied to every buy signal. null = not
+    // set (each signal uses its own TraderPRO-stated %); a number overrides
+    // every signal uniformly. There is deliberately no per-signal override —
+    // this single setting is the only way to size positions differently from
+    // what TraderPRO states, configured in the popup next to accountBalance.
+    positionPercentOverride: null,
     roundingMode: 'roundDown', // 'raw' | 'roundDown' | 'roundUpThreshold'
     roundUpThresholdAmount: 5
   };

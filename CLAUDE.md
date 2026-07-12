@@ -41,19 +41,33 @@ Consequences:
 | `shared/format.js` | Currency/number/percent display formatting |
 | `shared/messaging.js` | Message type constants (`TPS_GET_QUOTE`, `TPS_GET_FX_RATE`, `TPS_GET_SIGNALS`) + `chrome.runtime`/`chrome.tabs` wrapper functions |
 | `background/background.js` | Routes `TPS_GET_QUOTE`/`TPS_GET_FX_RATE` messages to `shared/quotes.js`/`shared/fx.js`, through an in-memory 60s cache (`Map`, not persisted — fine if the service worker unloads, just costs an extra fetch) |
-| `content/content.js` | Finds `.t09.t09_open_position` cards, injects computed fields as native-looking `.t09_bl` rows (see "Injection styling" below), turns the site's own "Количество" row into the editable % input, reacts to settings changes, runs a self-healing `MutationObserver` for dynamically-loaded cards, and responds to `TPS_GET_SIGNALS` messages from the popup |
-| `popup/popup.js` | Messages the active tab's content script for the current signal list (falls back to `chrome.scripting.executeScript` re-injection if the content script isn't loaded), fetches quote/FX per signal via the background worker, renders using `TPS.sizing`. Also owns the inline, auto-focused account-balance input in the popup header (see below) |
+| `content/content.js` | Finds `.t09.t09_open_position` cards, appends computed fields (including a *static, read-only* effective-% display) as native-looking `.t09_bl` rows (see "Injection styling" below) without touching the site's own "Количество" field, reacts to settings changes, runs a self-healing `MutationObserver` for dynamically-loaded cards, and responds to `TPS_GET_SIGNALS` messages from the popup |
+| `popup/popup.js` | Messages the active tab's content script for the current signal list (falls back to `chrome.scripting.executeScript` re-injection if the content script isn't loaded), fetches quote/FX per signal via the background worker, renders using `TPS.sizing`. Also owns the popup header's two global inputs: `accountBalanceInput` (auto-focused) and `positionPercentInput` (see "Position % override" below) |
 | `options/options.js` | Auto-saving settings form bound to `TPS.storage` |
 
 ## Data flow for one signal card
 
 1. `content.js` finds a `.t09.t09_open_position` card not yet marked `data-tps-processed`.
-2. `shared/scrape.js` extracts `{ticker, instrument, exchange, date, statedPercent, quantityBlockEl, quantityValueEl}` by matching Bulgarian `.lbl` text (see "DOM scraping" below), not by the numbered CSS classes. `quantityBlockEl`/`quantityValueEl` point at the site's own "Количество" row.
-3. `content.js` calls `makeQuantityFieldEditable(state)`, which turns that existing row's value into a live `<input>` in place (state.percentInputEl), then `buildFieldsGroup(state)` builds the *appended* rows (a header row + price/shares/total-position/total-account/meta, each an ordinary `.t09_bl` — see "Injection styling") and appends them to `.t09_1`. Only if `quantityBlockEl` wasn't found does the fields group fall back to including its own percent-input row.
+2. `shared/scrape.js` extracts `{ticker, instrument, exchange, date, statedPercent}` by matching Bulgarian `.lbl` text (see "DOM scraping" below), not by the numbered CSS classes. The site's own "Количество" field is only *read* here, never modified — see "Position % override" below.
+3. `content.js` resolves `TPS.sizing.resolveEffectivePercent(scraped.statedPercent, settings.positionPercentOverride)` and calls `buildFieldsGroup(state, settings)`, which builds the *appended* rows (a static, read-only "Позиция %" value + price/shares/total-position/total-account/meta, each an ordinary `.t09_bl` preceded by one divider — see "Injection styling") and appends them to `.t09_1`.
 4. `content.js` asks the background worker for a quote (`TPS_GET_QUOTE`) and, if the quote's currency differs from the account currency, an FX rate (`TPS_GET_FX_RATE`).
 5. `background.js` serves these from its 60s cache or fetches fresh via `shared/quotes.js`/`shared/fx.js`.
-6. `content.js` calls `TPS.sizing.computePositionSize()` with the settings + quote + fx and renders the result into the appended `.tps-*-value` spans. Editing the %-input recomputes locally (debounced, no refetch) since price/fx are already cached in the card's in-memory state.
-7. Settings changes (`TPS.storage.onSettingsChanged`) recompute all `ready` cards immediately; a currency change also re-fetches the FX leg. A card's user-set % is **never** overwritten by a settings change — only newly-appearing cards pick up a new global default (signal-stated vs. fixed-override).
+6. `content.js` calls `TPS.sizing.computePositionSize()` with `percent: TPS.sizing.resolveEffectivePercent(state.statedPercent, settings.positionPercentOverride)` (see "Position % override") and renders the result into the appended `.tps-*-value` spans.
+7. Settings changes (`TPS.storage.onSettingsChanged`) recompute all `ready` cards immediately; a currency change also re-fetches the FX leg; a `positionPercentOverride` change updates the static "Позиция %" display for *every* card, including ones still loading or errored (not just `ready` ones — that value doesn't depend on quote/fx).
+
+## Position % override — global only, no per-signal override
+
+There is no per-signal position-size editing. The only two inputs to position size are the signal's own stated %, scraped as `state.statedPercent`, and a single **global** override, `settings.positionPercentOverride` (`null` = not set), configured once in the popup next to `accountBalance` — never per-card, never on the injected page. The two are reconciled by the single shared helper `TPS.sizing.resolveEffectivePercent()` (in `shared/sizing.js`, not duplicated in `content.js`/`popup.js`):
+
+```js
+function resolveEffectivePercent(statedPercent, globalOverride) {
+  return globalOverride !== null && globalOverride !== undefined && isFinite(globalOverride) ? globalOverride : statedPercent;
+}
+```
+
+- The injected "Позиция %" field on each card is **static text** (`.tps-percent-value`), not an input — there is nothing to click or edit on the TraderPRO page itself. It just reflects whatever the global override currently resolves to for that signal.
+- `popup.js`'s `positionPercentInput` is the only editable control: empty → `positionPercentOverride: null` (saved via `TPS.storage.setSettings`) → every card falls back to its own `statedPercent`; a number → every card uses that same number.
+- If you're asked for "let me set a % on this one signal" again, that's a per-signal override — it was deliberately removed in favor of this single global one. Confirm with the user before reintroducing per-card editing; don't assume the two requests are the same.
 
 ## DOM scraping notes (this is the most fragile part of the codebase)
 
@@ -74,25 +88,33 @@ TraderPRO's markup (confirmed from a real saved page) looks like:
 
 ## Injection styling — fit natively, but stay distinguishable
 
-Earlier versions appended one visually separate `<div>` with its own box/border that visibly "extended" each card. That was replaced deliberately: appended fields are now individual `.t09_bl` rows (the exact class the site uses for every other field), wrapped in a `div.tps-fields-group { display: contents; }` — the wrapper contributes no box of its own, so its `.t09_bl` children slot into the card's existing row flow exactly like native fields, inheriting the site's real `.lbl`/`.val` typography instead of a hand-guessed style (we don't have the site's actual CSS, so matching by reusing its classes is more reliable than trying to replicate colors/fonts).
+**Key layout fact, learned by shipping a version that looked broken and fixing it:** `.t09_1` is a CSS grid (5 columns in the observed layout), and each `.t09_bl` is exactly **one grid cell** containing a label line over a value line — it is not an independent full-width row. This matters a lot for anything appended here:
 
-To keep it distinguishable as extension output without a heavy visual break:
-- A single header row (`.tps-field-header`, built in `buildFieldsGroup`) introduces the appended section: an accent-colored label with a "⚡" marker and a `title` tooltip explaining it's added by the extension.
-- Every extension-touched row — the appended ones *and* the site's own "Количество" row once `makeQuantityFieldEditable` turns it into an input — gets a thin accent bar via `box-shadow: inset 3px 0 0 0 ...` (chosen over `border-left` specifically because it doesn't consume layout space or require compensating padding, so it can't shift the row against the site's own CSS).
-- The "Количество" row additionally gets a small "✎" marker appended to its label (not a full header — it's a *modified* native field, not a new one) with its own tooltip.
-- The `%` input itself is styled to look like plain text until hovered/focused (transparent border/background, `font: inherit`), so it doesn't read as a foreign form control dropped into the page.
+- A cell that isn't a real label/value pair doesn't fit the grid. An earlier version added a standalone "header" cell (just a label, no value) to introduce the appended section — it rendered as an orphaned label with a dangling empty gap underneath it (where its hidden value would have been), because the grid row's height is set by its tallest cell. **Don't reintroduce a header cell** — every appended `.t09_bl` must be a genuine label+value pair.
+- `.val` may lay its children out with `justify-content: space-between` or similar (it's normally a single text node, so this is invisible on native fields). Giving `.val` two direct children — e.g. an `<input>` followed by a literal `%` — gets them shoved apart with a visible gap. If a future field needs more than one node inside `.val`, wrap them in a single child element first (this bit us once with an editable %-input-plus-"%"-text field; that field is gone now, but the gotcha applies to anything similar).
 
-If TraderPRO's own CSS changes such that `.t09_bl`/`.lbl`/`.val` stop existing or mean something different, this whole approach needs re-validating — it depends on those classes staying meaningful.
+With that constraint respected, appended fields are individual `.t09_bl` cells (the exact class the site uses for every field), wrapped in a `div.tps-fields-group { display: contents; }` — the wrapper contributes no box of its own, so its `.t09_bl` children slot directly into `.t09_1`'s grid like native fields, inheriting the site's real `.lbl`/`.val` typography instead of a hand-guessed style (we don't have the site's actual CSS, so matching by reusing its classes is more reliable than trying to replicate colors/fonts).
 
-## Inline balance editing (popup)
+**Distinguishability history — two approaches were tried and dropped before landing on the current one:**
+1. Per-cell marker icons ("⚡"/"✎" spans with `title` tooltips) on every label, plus a `box-shadow: inset` accent bar and a `border-top` on every appended cell. Removed on request — it read as visual noise/a rendering glitch (the accent bar in particular appeared on the "wrong" side at grid-cell boundaries), and per-cell borders pieced together into an uneven line rather than a clean one.
+2. What's used now: **one single full-width divider**, `.tps-divider` (`grid-column: 1 / -1`, a plain `border-top` in a neutral gray — not the extension's own accent color, so it reads as an ordinary section rule rather than a branded element), inserted once as the first child of `.tps-fields-group`. `grid-column: 1 / -1` spans from the grid's first line to its last regardless of the actual column count, so it doesn't hardcode "5 columns" anywhere. No icons, no tooltips, no per-cell decoration — the divider alone marks where native fields end and appended ones begin.
 
-Because the account balance changes far more often than currency/sizing-mode/rounding, it's editable directly in the popup header (`accountBalanceInput` in `popup/popup.html`), not just on the Options page. `popup.js`:
+If you're asked to make this "more distinguishable" again, prefer adjusting the divider (thickness/color/spacing) over reintroducing per-cell decoration — that's the part that kept looking broken.
 
-- Auto-focuses and selects that input on popup open, so opening the popup (one click) is enough to start typing a new balance — no second click to find/enter an edit field.
-- Debounces (300ms) writes through `TPS.storage.setSettings({accountBalance: ...})`, mutates the shared in-memory `settings` object in place (the same object reference is threaded through the whole render chain — `buildSignalItem` → `loadAndRenderSignal` → `renderResult` — so later calls automatically see the new value), and re-renders every currently-displayed signal from a `renderedItems` array (`{item, state}` pairs pushed in `loadAndRenderSignal`) without refetching price/FX.
-- Because this goes through `chrome.storage.sync`, `content.js`'s `TPS.storage.onSettingsChanged` listener picks up the change too — editing the balance in the popup also live-updates the in-page injected cards on the TraderPRO tab, for free, via the existing settings-reactivity path.
+**Column alignment nudge:** appended cells rendered slightly left of the native columns above them (`.tps-fields-group > .t09_bl { margin-left: 6px; }` in `content.css`). This is an *empirical* fix, not a principled one — without the site's real CSS there's no way to know the exact root cause (a good guess: native `.t09_bl` cells may carry some inner structure/padding this extension's plain-div cells don't reproduce). If TraderPRO's layout changes and this starts looking off again, re-measure and adjust the `6px` rather than assuming it's still correct.
 
-If you add another frequently-changing setting later, follow this same pattern (inline in the popup + `chrome.storage` propagation) rather than burying it in Options.
+A follow-up request to instead right-align the appended cells' text (`text-align: right` on `.lbl`/`.val`) was tried and then explicitly reverted back to this `margin-left` approach — don't reintroduce the text-align version without checking that it's actually wanted again.
+
+## Inline popup editing — the ONLY place accountBalance and positionPercentOverride are set
+
+Both `accountBalance` and `positionPercentOverride` are edited **exclusively** in the popup header (`accountBalanceInput` and `positionPercentInput` in `popup/popup.html`, stacked in `.tps-header-main`) — there is deliberately no balance or global-%-override field on the Options page (`options/options.html`/`options.js` only handle `accountCurrency` and rounding). If you're asked to add either somewhere else (Options, or — for the %-override — per-signal on the injected page), check first whether the intent is really "another place" or "move it back": both were explicitly consolidated to this single popup location on request. `popup.js`:
+
+- `bindBalanceInput()` auto-focuses and selects `accountBalanceInput` on popup open, so opening the popup (one click) is enough to start typing a new balance — no second click to find/enter an edit field. `bindPositionPercentInput()` does the equivalent for `positionPercentInput` (same debounce/save/indicator pattern) but does **not** auto-focus — balance is the field that changes daily, the % override doesn't.
+- Both debounce (300ms) writes through `TPS.storage.setSettings({...})`, mutate the shared in-memory `settings` object in place (the same object reference is threaded through the whole render chain — `buildSignalItem` → `loadAndRenderSignal` → `renderResult` — so later calls automatically see the new value), and re-render every currently-displayed signal from a `renderedItems` array (`{item, state}` pairs pushed in `loadAndRenderSignal`) without refetching price/FX. The %-override handler additionally calls `updatePercentDisplay()` directly, since `renderResult()` only updates items whose quote/fx has already loaded.
+- Because this goes through `chrome.storage.sync`, `content.js`'s `TPS.storage.onSettingsChanged` listener picks up both changes too — editing either field in the popup also live-updates the in-page injected cards on the TraderPRO tab, for free, via the existing settings-reactivity path.
+- `options.js`'s `readFormAsPartialSettings()` deliberately omits both `accountBalance` and `positionPercentOverride` from the object it saves — `TPS.storage.setSettings()` merges partial updates onto existing settings, so omitting them there preserves whatever the popup last saved instead of stomping them back to whatever stale value the Options form last saw.
+
+If you add another frequently-changing setting later, follow this same pattern (inline in the popup + `chrome.storage` propagation) rather than adding it to Options.
 
 ## Rounding formula (`shared/sizing.js`)
 
@@ -112,7 +134,7 @@ There is no automated test suite. Verify manually:
 1. `chrome://extensions` → Developer mode → Load unpacked.
 2. Log into `login.traderpro.bg`, open the signals page, confirm buy cards get sizing blocks and sell cards don't.
 3. Check the service worker's DevTools console (`chrome://extensions` → "service worker" link) for `TPS_GET_QUOTE`/`TPS_GET_FX_RATE` traffic and 60s caching behavior.
-4. In Options, change balance/currency/rounding/sizing-mode and confirm already-rendered cards update without losing hand-edited %s.
+4. In the popup, edit the balance and confirm every card's totals update; edit the % override (set a number, then clear it back to empty) and confirm every card's "Позиция %" and totals switch between the override and each signal's own stated % accordingly. In Options, change currency/rounding and confirm already-rendered cards update.
 5. Block `query1/query2.finance.yahoo.com` in DevTools' Network conditions to force the Stooq fallback path and confirm the "source: stooq" badge appears.
 6. Open the popup and confirm it matches the in-page numbers.
 

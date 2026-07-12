@@ -1,38 +1,49 @@
 /* Deliberately minimal: injected rows reuse the site's own .t09_bl/.lbl/.val
    classes so they inherit its real typography/spacing/colors instead of
-   fighting them. Only the accent bar, marker icons, and header row below are
-   ours — everything else is intentionally un-styled here. */
+   fighting them. Distinguishability comes from a single divider line above the
+   appended section (.tps-divider) — no icons, no per-cell borders/accents;
+   those were tried and looked like visual noise/glitches against the real page.
+
+   Important layout fact this file depends on: TraderPRO's ".t09_1" is a CSS
+   grid (5 columns in the observed layout) where each ".t09_bl" is exactly one
+   grid cell containing a label line over a value line. There is no room for a
+   "section header" cell that isn't a real label/value pair — one was tried and
+   looked broken (an orphaned label with a dangling empty gap under it where its
+   hidden value would have been). Appended fields must always be genuine
+   label+value pairs. */
 
 /* The wrapper around appended rows takes no box of its own (no border/background/
-   margin) so its .t09_bl children slot into the card's existing row layout exactly
-   like the site's native fields do, instead of being visually grouped into a
-   separate box that "extends" the card. */
+   margin) so its .t09_bl children — and the divider below — slot directly into
+   the card's existing grid, instead of being visually grouped into a separate
+   box that "extends" the card. */
 .tps-fields-group {
   display: contents;
 }
 
-/* Every extension-touched row (both appended ones and the site's own "Количество"
-   row once made editable) gets a thin accent bar so, taken together, they read as
-   a distinguishable set without needing a heavy background or border per row. */
-.tps-field {
-  box-shadow: inset 3px 0 0 0 rgba(57, 152, 192, 0.55);
+/* Empirical alignment nudge: appended cells render slightly left of where the
+   native fields above them start (we don't have the site's real CSS to know
+   why — likely something the native ".t09_bl" markup carries that ours, being
+   plain divs with no extra nesting, doesn't reproduce). Only the field cells
+   are nudged, not .tps-divider, which is meant to span edge-to-edge. Re-check
+   this value (and whether it's still needed at all) if TraderPRO's layout
+   changes. */
+.tps-fields-group > .t09_bl {
+  margin-left: 6px;
 }
 
-.tps-field-header .lbl {
-  color: #3998c0;
-  font-weight: 600;
-  font-size: 0.85em;
-  letter-spacing: 0.02em;
-}
-
-.tps-field-header .val {
-  display: none; /* header row only needs the label side */
-}
-
-.tps-marker {
-  cursor: help;
-  font-style: normal;
-  color: #3998c0;
+/* The one dividing line between native fields and the extension's appended
+   ones. Spans the full grid width (grid-column: 1 / -1 works regardless of the
+   actual column count) rather than being pieced together from per-cell borders,
+   which read as a broken/uneven line at grid-cell boundaries. Neutral gray
+   ("native color") rather than the extension's own accent color, so it reads as
+   an ordinary section rule instead of a branded element. */
+.tps-divider {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 0;
+  margin: 8px 0;
+  border: none;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 .tps-field-meta .val {
@@ -50,28 +61,6 @@
 .tps-field-meta.tps-meta-hint .val {
   color: #b8860b;
   font-style: normal;
-}
-
-/* The editable % input is styled to look like plain text until the user
-   interacts with it, so it blends into the row instead of looking like a
-   foreign form control dropped into the site's UI. */
-.tps-percent-input {
-  width: 3.6em;
-  border: 1px solid transparent;
-  background: transparent;
-  font: inherit;
-  color: inherit;
-  text-align: inherit;
-  padding: 0 2px;
-  border-radius: 3px;
-  box-sizing: border-box;
-}
-
-.tps-percent-input:hover,
-.tps-percent-input:focus {
-  border-color: rgba(57, 152, 192, 0.6);
-  background: rgba(57, 152, 192, 0.08);
-  outline: none;
 }
 
 [hidden] {
