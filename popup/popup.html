@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8">
+<title>TraderPRO Position Sizer</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="tps-popup">
+    <header class="tps-popup-header">
+      <div>
+        <strong>TraderPRO Position Sizer</strong>
+        <div id="balanceSummary" class="tps-balance-summary">—</div>
+      </div>
+      <button id="openOptionsBtn" class="tps-link-btn" type="button">Настройки</button>
+    </header>
+
+    <div id="emptyState" class="tps-empty-state" hidden>
+      Отворете страница със сигнали на TraderPRO (login.traderpro.bg), за да видите сигналите тук.
+    </div>
+
+    <ul id="signalsList" class="tps-signals-list"></ul>
+  </div>
+  <script src="../shared/storage.js"></script>
+  <script src="../shared/messaging.js"></script>
+  <script src="../shared/sizing.js"></script>
+  <script src="../shared/format.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "TraderPRO Position Sizer",
+  "description": "Adds live share-count and cost calculations to TraderPRO buy signals, with currency conversion and configurable rounding.",
+  "version": "0.1.0",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "options_page": "options/options.html",
+  "background": {
+    "service_worker": "background/background.js"
+  },
+  "permissions": ["storage", "scripting"],
+  "host_permissions": [
+    "https://*.traderpro.bg/*",
+    "https://query1.finance.yahoo.com/*",
+    "https://query2.finance.yahoo.com/*",
+    "https://stooq.com/*",
+    "https://api.frankfurter.app/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://login.traderpro.bg/*"],
+      "js": [
+        "shared/storage.js",
+        "shared/messaging.js",
+        "shared/sizing.js",
+        "shared/scrape.js",
+        "shared/format.js",
+        "content/content.js"
+      ],
+      "css": ["content/content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

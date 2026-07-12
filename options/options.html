@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8">
+<title>TraderPRO Position Sizer — Настройки</title>
+<link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <main class="tps-options">
+    <h1>TraderPRO Position Sizer — Настройки</h1>
+
+    <section class="tps-card">
+      <h2>Сметка</h2>
+      <div class="tps-field-row">
+        <label for="accountBalance">Наличност по сметка</label>
+        <input id="accountBalance" type="number" min="0" step="0.01" inputmode="decimal">
+      </div>
+      <div class="tps-field-row">
+        <label for="accountCurrency">Валута на сметката</label>
+        <select id="accountCurrency"></select>
+      </div>
+    </section>
+
+    <section class="tps-card">
+      <h2>Размер на позицията</h2>
+      <div class="tps-radio-row">
+        <label><input type="radio" name="positionSizingMode" value="signal"> Използвай % от сигнала</label>
+        <label><input type="radio" name="positionSizingMode" value="fixed"> Фиксиран % за всички позиции</label>
+      </div>
+      <div class="tps-field-row" id="fixedPercentRow">
+        <label for="fixedPercent">Фиксиран % от капитала</label>
+        <input id="fixedPercent" type="number" min="0" max="100" step="0.1">
+      </div>
+    </section>
+
+    <section class="tps-card">
+      <h2>Закръгляне на брой акции</h2>
+      <div class="tps-radio-row tps-radio-col">
+        <label><input type="radio" name="roundingMode" value="raw"> Точна стойност (без закръгляне)</label>
+        <label><input type="radio" name="roundingMode" value="roundDown"> Винаги закръгляй надолу</label>
+        <label><input type="radio" name="roundingMode" value="roundUpThreshold"> Закръгли нагоре, ако допълнителната цена е под праг</label>
+      </div>
+      <div class="tps-field-row" id="thresholdRow">
+        <label for="roundUpThresholdAmount">Праг (във валутата на сметката)</label>
+        <input id="roundUpThresholdAmount" type="number" min="0" step="0.01">
+      </div>
+      <p class="tps-hint">
+        При изчислен резултат напр. 41.87 акции: цената на закръгляне нагоре до 42 е
+        (42 − 41.87) × цена на акция. Ако тази допълнителна сума е под зададения праг,
+        се закръглява нагоре до 42, иначе се закръглява надолу до 41.
+      </p>
+    </section>
+
+    <p id="saveStatus" class="tps-save-status" hidden>Запазено</p>
+  </main>
+  <script src="../shared/storage.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>
