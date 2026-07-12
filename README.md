@@ -17,13 +17,49 @@ Sell/close-position signals ("ПРОДАВА") are left untouched — they don't
 
 ## Installation (unpacked — not yet on the Chrome Web Store)
 
-1. Open `chrome://extensions` in Chrome.
-2. Enable **Developer mode** (top-right toggle).
-3. Click **Load unpacked** and select this project folder.
-4. Click the extension's icon and type your account balance into the field right there in the popup (see below) — that's the only place it's set.
-5. Log into `login.traderpro.bg` and open the strategy/signals page — buy-signal cards should now show live pricing and share counts.
+This extension isn't published on the Chrome Web Store, so it's loaded as an "unpacked" extension straight from this folder — the standard way to run a local/dev Chrome extension.
 
-## Editing your balance and position size (popup)
+1. Download or `git clone` this repository somewhere permanent on disk (don't install from a temp folder — Chrome re-reads the extension from this location every time it loads, and deleting/moving the folder later will break or remove the extension).
+2. Open `chrome://extensions` in Chrome (type it directly into the address bar — it's a special internal page, not something you can search to).
+3. Turn on **Developer mode** using the toggle in the top-right corner. This unlocks the **Load unpacked** button (without it, Chrome only accepts extensions from the Web Store).
+4. Click **Load unpacked**, then select this project's root folder (the one containing `manifest.json`).
+5. The extension now appears in your extensions list as "TraderPRO Position Sizer" and its icon appears in the toolbar (you may need to click the puzzle-piece icon in the toolbar and pin it for quicker access).
+6. Chrome grants the extension's declared permissions automatically at load time for unpacked extensions — see [Enabling site access](#enabling-site-access-chrome-permissions) below if you ever need to double-check or fix this.
+7. Continue to [Getting started](#getting-started-first-time-setup) below to set your account balance and start using it.
+
+To update later (e.g. after pulling new changes), go back to `chrome://extensions` and click the refresh icon on the extension's card — Chrome doesn't auto-reload unpacked extensions when the files on disk change.
+
+## Enabling site access (Chrome permissions)
+
+The extension needs Chrome's permission to talk to a small, fixed set of hosts — declared in `manifest.json`'s `host_permissions` and requested up front, not asked for one-by-one at runtime:
+
+| Host | Why |
+|---|---|
+| `login.traderpro.bg` | Where the content script runs — this is what reads the signal cards and injects the sizing rows onto the page. |
+| `query1.finance.yahoo.com`, `query2.finance.yahoo.com` | Live share price and FX rates (primary source). |
+| `stooq.com` | Fallback price source if Yahoo is unreachable. |
+| `api.frankfurter.app` | Fallback FX-rate source if Yahoo's FX pseudo-tickers are unreachable. |
+
+For an unpacked extension loaded via **Load unpacked**, Chrome grants all of these automatically — there's no separate "Allow" click needed, and no permissions popup to accept. You only need to actively check this if the extension seems to not be working on the TraderPRO page (no sizing rows appear, or the popup shows nothing):
+
+1. Go to `chrome://extensions`, find "TraderPRO Position Sizer", and click **Details**.
+2. Scroll to **Site access** and confirm it's set to **On specific sites** (with `login.traderpro.bg` listed) or **On all sites** — not **On click**. If it's set to **On click**, the content script won't automatically run on page load; switch it to **On specific sites**.
+3. Alternatively, on the TraderPRO page itself, click the puzzle-piece icon in Chrome's toolbar, find the extension, and make sure it isn't paused/blocked for that site.
+4. If you changed anything, reload the TraderPRO signals page for it to take effect.
+
+The extension also requests two non-host permissions: `storage` (to save your balance/settings via `chrome.storage.sync`) and `scripting` (used only as a fallback — if the popup can't reach an already-loaded content script on the active tab, it re-injects one via `chrome.scripting.executeScript` so the popup still works right after installing, before you've reloaded the TraderPRO tab).
+
+## Getting started (first-time setup)
+
+1. Log into `login.traderpro.bg` in a tab and open the strategy/signals page.
+2. Click the extension's toolbar icon to open the popup.
+3. Type your account balance into the **Наличност** field — it's auto-focused, so you can start typing immediately after opening the popup. This is the only place your balance is set (see [Configuring](#configuring) below for why).
+4. Switch back to the TraderPRO tab (or just look at the popup) — buy-signal cards should now show a live price, share count, and total cost. If nothing appears, see [Enabling site access](#enabling-site-access-chrome-permissions) above.
+5. Optionally set your account currency and rounding preference on the Options page (click **Настройки** in the popup) — see [Configuring](#configuring) below.
+
+## Configuring
+
+### Balance and position-size override (popup)
 
 Both your account balance and your position-size override are configured in **exactly one place: the popup** — click the toolbar icon and both fields are right there.
 
@@ -34,18 +70,31 @@ Both fields save automatically as you type (debounced ~300ms, with a small ✓ c
 
 The account currency and rounding mode change far less often, so those stay on the Options page (click **Настройки** in the popup, or right-click the toolbar icon → Options).
 
-## Configuring (Options page)
+### Account currency and rounding (Options page)
 
 | Setting | What it does |
 |---|---|
 | **Account currency** | The currency your balance (set in the popup, see above) is denominated in. |
 | **Rounding mode** | See below. |
 
+Changes on the Options page save automatically (same debounce-and-confirm behavior as the popup) and immediately update any signals already showing in the popup or on the TraderPRO page.
+
 ### Rounding modes
 
 - **Raw** — show the exact, unrounded share count (e.g. `41.87`). Useful if you trade fractional shares manually.
 - **Always round down** — floor to the nearest whole share (conservative, never overspends your target allocation).
 - **Round up if the extra cost is below a threshold** — you set a threshold amount in your account currency. If rounding up to the next whole share costs less than that threshold, it rounds up; otherwise it rounds down. Example: raw = 41.87 shares at $50/share. Rounding up to 42 costs `(42 − 41.87) × $50 = $6.50` extra. If your threshold is $10, it rounds up to 42; if your threshold is $5, it rounds down to 41.
+
+## Using the extension day-to-day
+
+Once your balance is set (see [Getting started](#getting-started-first-time-setup)), there's nothing else to do — the extension works passively:
+
+- **On the TraderPRO page**: every buy-signal card automatically gets a **Позиция %**, **Цена / бр.**, **Брой акции**, **Сума (вал. на акцията)**, and **Сума (моята валута)** row appended below its existing fields, separated by a thin divider. New cards that load in later (e.g. after scrolling or filtering signals) are picked up automatically — no need to refresh the page.
+- **In the popup**: click the toolbar icon any time for the same numbers in a compact list, without needing to be looking at the TraderPRO tab.
+- **Source badges**: if a price or FX rate came from a fallback source (Stooq instead of Yahoo, or Frankfurter/the BGN peg instead of Yahoo FX) rather than the primary one, a small badge appears next to that signal (e.g. "цена: stooq (прибл.)") so you know it's an approximation — see [How prices and FX rates are fetched](#how-prices-and-fx-rates-are-fetched) below.
+- **Errors**: if a price/FX lookup fails for a signal (e.g. an unrecognized ticker, or all sources down), that signal shows a "Грешка: …" message in place of its numbers instead of silently showing nothing.
+- **Editing balance or % override**: any change in the popup (see [Configuring](#configuring)) instantly recalculates every visible signal, both in the popup and on the TraderPRO page — there's no separate "apply"/"refresh" step.
+- **Sell signals** ("ПРОДАВА") are always left as-is; only buy signals get sizing math.
 
 ## How prices and FX rates are fetched
 
