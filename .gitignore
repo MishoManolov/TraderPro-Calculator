@@ -15,3 +15,8 @@ desktop.ini
 *.zip
 *.crx
 *.pem
+
+# Local reference copy of a live TraderPRO page (design/context reference only,
+# not for redistribution — may contain the contributor's own session data)
+TraderPRO - example page.html
+TraderPRO - example page_files/

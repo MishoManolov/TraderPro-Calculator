@@ -6,89 +6,30 @@
     'shared/sizing.js',
     'shared/scrape.js',
     'shared/format.js',
-    'content/content.js'
+    'content/content.js',
+    'content/widget.js'
   ];
 
   var els = {
-    accountBalanceInput: document.getElementById('accountBalanceInput'),
-    balanceCurrencyPrefix: document.getElementById('balanceCurrencyPrefix'),
-    balanceSavedIndicator: document.getElementById('balanceSavedIndicator'),
-    positionPercentInput: document.getElementById('positionPercentInput'),
-    percentSavedIndicator: document.getElementById('percentSavedIndicator'),
+    settingsSummary: document.getElementById('settingsSummary'),
     emptyState: document.getElementById('emptyState'),
     signalsList: document.getElementById('signalsList'),
     openOptionsBtn: document.getElementById('openOptionsBtn')
   };
 
-  var renderedItems = []; // {item, state} for every signal currently rendered, so a balance/% edit can re-render them all
-
   els.openOptionsBtn.addEventListener('click', function () {
     chrome.runtime.openOptionsPage();
   });
 
-  function bindBalanceInput(settings) {
-    els.balanceCurrencyPrefix.textContent = TPS.format.currencySymbol(settings.accountCurrency);
-    els.accountBalanceInput.value = settings.accountBalance;
-
-    var saveTimer = null;
-    var indicatorTimer = null;
-
-    els.accountBalanceInput.addEventListener('input', function () {
-      var value = parseFloat(els.accountBalanceInput.value);
-      if (!isFinite(value) || value < 0) return;
-      if (saveTimer) clearTimeout(saveTimer);
-      saveTimer = setTimeout(function () {
-        settings.accountBalance = value; // shared reference — every closure below sees the update immediately
-        TPS.storage.setSettings({ accountBalance: value }).then(function () {
-          els.balanceSavedIndicator.hidden = false;
-          if (indicatorTimer) clearTimeout(indicatorTimer);
-          indicatorTimer = setTimeout(function () {
-            els.balanceSavedIndicator.hidden = true;
-          }, 1200);
-        });
-        renderedItems.forEach(function (entry) {
-          renderResult(entry.item, entry.state, settings);
-        });
-      }, 300);
-    });
-
-    // Single click to open the popup is enough to start editing — no extra click needed.
-    els.accountBalanceInput.focus();
-    els.accountBalanceInput.select();
-  }
-
-  // The one global position-size override, applied to every signal — see
-  // TPS.sizing.resolveEffectivePercent(). Left empty, each signal uses its own
-  // TraderPRO-stated %; a number here overrides all of them uniformly. No
-  // per-signal override exists anymore (deliberately removed).
-  function bindPositionPercentInput(settings) {
-    if (settings.positionPercentOverride !== null && settings.positionPercentOverride !== undefined) {
-      els.positionPercentInput.value = settings.positionPercentOverride;
-    }
-
-    var saveTimer = null;
-    var indicatorTimer = null;
-
-    els.positionPercentInput.addEventListener('input', function () {
-      var raw = els.positionPercentInput.value.trim();
-      if (saveTimer) clearTimeout(saveTimer);
-      saveTimer = setTimeout(function () {
-        var value = raw === '' ? null : parseFloat(raw);
-        if (value !== null && !isFinite(value)) return;
-        settings.positionPercentOverride = value; // shared reference
-        TPS.storage.setSettings({ positionPercentOverride: value }).then(function () {
-          els.percentSavedIndicator.hidden = false;
-          if (indicatorTimer) clearTimeout(indicatorTimer);
-          indicatorTimer = setTimeout(function () {
-            els.percentSavedIndicator.hidden = true;
-          }, 1200);
-        });
-        renderedItems.forEach(function (entry) {
-          updatePercentDisplay(entry.item, entry.state, settings);
-          renderResult(entry.item, entry.state, settings);
-        });
-      }, 300);
-    });
+  // accountBalance and positionPercentOverride are edited exclusively in the
+  // floating widget injected onto the TraderPRO page (content/widget.js) — the
+  // popup only shows a read-only summary of their current values.
+  function renderSettingsSummary(settings) {
+    var balanceText = TPS.format.formatMoney(settings.accountBalance, settings.accountCurrency);
+    var percentText = (settings.positionPercentOverride !== null && settings.positionPercentOverride !== undefined)
+      ? TPS.format.formatPercent(settings.positionPercentOverride) + ' (ръчно)'
+      : 'от сигнала';
+    els.settingsSummary.textContent = 'Наличност: ' + balanceText + ' · Позиция %: ' + percentText;
   }
 
   function getActiveTab() {
@@ -115,7 +56,6 @@
     els.emptyState.hidden = true;
     els.signalsList.hidden = false;
     els.signalsList.innerHTML = '';
-    renderedItems = [];
     signals.forEach(function (signal) {
       var item = buildSignalItem(signal, settings);
       els.signalsList.appendChild(item);
@@ -148,15 +88,8 @@
     return escapeHtmlScratchDiv.innerHTML;
   }
 
-  function updatePercentDisplay(item, state, settings) {
-    var el = item.querySelector('.tps-percent-value');
-    if (!el) return;
-    el.textContent = TPS.format.formatPercent(TPS.sizing.resolveEffectivePercent(state.statedPercent, settings.positionPercentOverride));
-  }
-
   function loadAndRenderSignal(item, signal, settings) {
     var state = { quote: null, fx: null, statedPercent: signal.statedPercent };
-    renderedItems.push({ item: item, state: state });
 
     TPS.messaging.requestQuoteOrThrow(signal.ticker, 'Грешка при цена').then(function (quote) {
       state.quote = quote;
@@ -188,8 +121,7 @@
 
   function init() {
     TPS.storage.getSettings().then(function (settings) {
-      bindBalanceInput(settings);
-      bindPositionPercentInput(settings);
+      renderSettingsSummary(settings);
 
       getActiveTab().then(function (tab) {
         if (!tab || !tab.id) {

@@ -1,4 +1,4 @@
-# TraderPRO Position Sizer
+# TraderPro Calculator
 
 An unofficial Chrome extension (Manifest V3) that adds live position-sizing math directly onto [TraderPRO](https://login.traderpro.bg)'s buy signals: current price, the position-size % being used, the resulting share count, and the total cost — in both the stock's own currency and your account currency.
 
@@ -23,7 +23,7 @@ This extension isn't published on the Chrome Web Store, so it's loaded as an "un
 2. Open `chrome://extensions` in Chrome (type it directly into the address bar — it's a special internal page, not something you can search to).
 3. Turn on **Developer mode** using the toggle in the top-right corner. This unlocks the **Load unpacked** button (without it, Chrome only accepts extensions from the Web Store).
 4. Click **Load unpacked**, then select this project's root folder (the one containing `manifest.json`).
-5. The extension now appears in your extensions list as "TraderPRO Position Sizer" and its icon appears in the toolbar (you may need to click the puzzle-piece icon in the toolbar and pin it for quicker access).
+5. The extension now appears in your extensions list as "TraderPro Calculator" and its icon appears in the toolbar (you may need to click the puzzle-piece icon in the toolbar and pin it for quicker access).
 6. Chrome grants the extension's declared permissions automatically at load time for unpacked extensions — see [Enabling site access](#enabling-site-access-chrome-permissions) below if you ever need to double-check or fix this.
 7. Continue to [Getting started](#getting-started-first-time-setup) below to set your account balance and start using it.
 
@@ -42,42 +42,43 @@ The extension needs Chrome's permission to talk to a small, fixed set of hosts �
 
 For an unpacked extension loaded via **Load unpacked**, Chrome grants all of these automatically — there's no separate "Allow" click needed, and no permissions popup to accept. You only need to actively check this if the extension seems to not be working on the TraderPRO page (no sizing rows appear, or the popup shows nothing):
 
-1. Go to `chrome://extensions`, find "TraderPRO Position Sizer", and click **Details**.
+1. Go to `chrome://extensions`, find "TraderPro Calculator", and click **Details**.
 2. Scroll to **Site access** and confirm it's set to **On specific sites** (with `login.traderpro.bg` listed) or **On all sites** — not **On click**. If it's set to **On click**, the content script won't automatically run on page load; switch it to **On specific sites**.
 3. Alternatively, on the TraderPRO page itself, click the puzzle-piece icon in Chrome's toolbar, find the extension, and make sure it isn't paused/blocked for that site.
 4. If you changed anything, reload the TraderPRO signals page for it to take effect.
 
-The extension also requests two non-host permissions: `storage` (to save your balance/settings via `chrome.storage.sync`) and `scripting` (used only as a fallback — if the popup can't reach an already-loaded content script on the active tab, it re-injects one via `chrome.scripting.executeScript` so the popup still works right after installing, before you've reloaded the TraderPRO tab).
+The extension also requests two non-host permissions: `storage` (to save your balance/settings via `chrome.storage.sync`) and `scripting` (used only as a fallback — if the popup can't reach an already-loaded content script on the active tab, it re-injects the content script *and* the floating widget via `chrome.scripting.executeScript` so both still work right after installing, before you've reloaded the TraderPRO tab).
 
 ## Getting started (first-time setup)
 
 1. Log into `login.traderpro.bg` in a tab and open the strategy/signals page.
-2. Click the extension's toolbar icon to open the popup.
-3. Type your account balance into the **Наличност** field — it's auto-focused, so you can start typing immediately after opening the popup. This is the only place your balance is set (see [Configuring](#configuring) below for why).
-4. Switch back to the TraderPRO tab (or just look at the popup) — buy-signal cards should now show a live price, share count, and total cost. If nothing appears, see [Enabling site access](#enabling-site-access-chrome-permissions) above.
-5. Optionally set your account currency and rounding preference on the Options page (click **Настройки** in the popup) — see [Configuring](#configuring) below.
+2. A small floating panel appears docked to the right edge of the page. Type your account balance into the **Наличност** field there. This is the only place your balance is set (see [Configuring](#configuring) below for why).
+3. Buy-signal cards on the page should now show a live price, share count, and total cost. If nothing appears, see [Enabling site access](#enabling-site-access-chrome-permissions) above.
+4. Optionally set your account currency and rounding preference on the Options page (right-click the toolbar icon → Options, or click **Настройки** in the popup) — see [Configuring](#configuring) below.
 
 ## Configuring
 
-### Balance and position-size override (popup)
+### Balance and position-size override (floating widget on the page)
 
-Both your account balance and your position-size override are configured in **exactly one place: the popup** — click the toolbar icon and both fields are right there.
+Both your account balance and your position-size override are configured in **exactly one place: the floating widget** that appears on the TraderPRO page itself, docked to the right edge of the screen — no need to open the toolbar popup at all.
 
-- **Наличност (balance)** is auto-focused and ready to type into as soon as the popup opens, since it's the one that changes daily.
-- **Позиция % (position-size override)** sits right next to it. Leave it empty and every signal uses its own TraderPRO-stated %; type a number and *every* buy signal is sized at that % instead — this is a single global setting, not a per-signal one. There is no way to override the % for just one signal; if that's what you need, clear the global override, note the number for that trade, and set it back afterward.
+- **Наличност (balance)** is the top field, since it's the one that changes daily.
+- **Позиция % (position-size override)** sits right below it. Leave it empty and every signal uses its own TraderPRO-stated %; type a number and *every* buy signal is sized at that % instead — this is a single global setting, not a per-signal one. There is no way to override the % for just one signal; if that's what you need, clear the global override, note the number for that trade, and set it back afterward.
 
-Both fields save automatically as you type (debounced ~300ms, with a small ✓ confirming the save) and instantly recompute every share count/total, both in the popup and on the TraderPRO page itself. Neither has a field on the Options page.
+Both fields save automatically as you type (debounced ~300ms, with a small ✓ confirming the save) and instantly recompute every share count/total, both next to the signals and in the toolbar popup (which shows a read-only summary of both values). Neither has a field on the Options page.
 
-The account currency and rounding mode change far less often, so those stay on the Options page (click **Настройки** in the popup, or right-click the toolbar icon → Options).
+Click the **–** button in the widget's header to minimize it to a small tab docked at the same spot — click the tab again to expand it back. Your minimized/expanded preference is remembered across page reloads.
+
+The account currency and rounding mode change far less often, so those stay on the Options page (right-click the toolbar icon → Options, or click **Настройки** in the popup).
 
 ### Account currency and rounding (Options page)
 
 | Setting | What it does |
 |---|---|
-| **Account currency** | The currency your balance (set in the popup, see above) is denominated in. |
+| **Account currency** | The currency your balance (set in the floating widget, see above) is denominated in. |
 | **Rounding mode** | See below. |
 
-Changes on the Options page save automatically (same debounce-and-confirm behavior as the popup) and immediately update any signals already showing in the popup or on the TraderPRO page.
+Changes on the Options page save automatically (same debounce-and-confirm behavior as the widget) and immediately update any signals already showing on the TraderPRO page or in the popup, including the widget's currency prefix.
 
 ### Rounding modes
 
@@ -90,10 +91,11 @@ Changes on the Options page save automatically (same debounce-and-confirm behavi
 Once your balance is set (see [Getting started](#getting-started-first-time-setup)), there's nothing else to do — the extension works passively:
 
 - **On the TraderPRO page**: every buy-signal card automatically gets a **Позиция %**, **Цена / бр.**, **Брой акции**, **Сума (вал. на акцията)**, and **Сума (моята валута)** row appended below its existing fields, separated by a thin divider. New cards that load in later (e.g. after scrolling or filtering signals) are picked up automatically — no need to refresh the page.
-- **In the popup**: click the toolbar icon any time for the same numbers in a compact list, without needing to be looking at the TraderPRO tab.
+- **The floating widget**: docked to the right edge of the page (see [Configuring](#configuring)), always there for editing balance/% or checking the currently-set values, without switching tabs or clicking the toolbar icon. Minimize it out of the way with its **–** button whenever you don't need it.
+- **In the popup**: click the toolbar icon any time for a compact signals list plus a read-only summary of the current balance/% override, without needing to be looking at the TraderPRO tab.
 - **Source badges**: if a price or FX rate came from a fallback source (Stooq instead of Yahoo, or Frankfurter/the BGN peg instead of Yahoo FX) rather than the primary one, a small badge appears next to that signal (e.g. "цена: stooq (прибл.)") so you know it's an approximation — see [How prices and FX rates are fetched](#how-prices-and-fx-rates-are-fetched) below.
 - **Errors**: if a price/FX lookup fails for a signal (e.g. an unrecognized ticker, or all sources down), that signal shows a "Грешка: …" message in place of its numbers instead of silently showing nothing.
-- **Editing balance or % override**: any change in the popup (see [Configuring](#configuring)) instantly recalculates every visible signal, both in the popup and on the TraderPRO page — there's no separate "apply"/"refresh" step.
+- **Editing balance or % override**: any change in the floating widget (see [Configuring](#configuring)) instantly recalculates every visible signal, both on the TraderPRO page and in the popup's summary — there's no separate "apply"/"refresh" step.
 - **Sell signals** ("ПРОДАВА") are always left as-is; only buy signals get sizing math.
 
 ## How prices and FX rates are fetched
@@ -113,7 +115,6 @@ Once your balance is set (see [Getting started](#getting-started-first-time-setu
 - Yahoo Finance's chart endpoint is unofficial and could change or start blocking requests without notice — the Stooq fallback exists for this reason but only covers US-listed tickers and doesn't report currency (assumed USD).
 - Tickers are used as-is (no exchange-suffix mapping like `.L` for London), since TraderPRO's strategies currently trade only US-listed S&P 500 stocks.
 - The position-size % override is global only — there's no way to size one particular signal differently from the rest without temporarily changing (and then changing back) the global value.
-- Icons are placeholders — swap `icons/icon16.png`, `icon48.png`, `icon128.png` before any public release.
 
 ## Roadmap
 
@@ -126,9 +127,10 @@ Once your balance is set (see [Getting started](#getting-started-first-time-setu
 manifest.json              MV3 manifest — permissions, host permissions, content script registration
 shared/                    Plain-JS modules shared across contexts (storage, quotes, fx, sizing, scrape, format, messaging)
 background/background.js   Service worker — routes quote/FX requests, caches responses for 60s
-content/                   Content script — scrapes signal cards, injects the sizing UI, watches for DOM changes
-popup/                     Toolbar popup — mirrors the signals list with the same calculations
-options/                   Settings page — currency, rounding mode (balance is popup-only, see above)
+content/content.js         Content script — scrapes signal cards, injects the sizing UI, watches for DOM changes
+content/widget.js          Content script — floating balance/%-override widget docked to the page's right edge (see Configuring)
+popup/                     Toolbar popup — mirrors the signals list, shows a read-only balance/% summary
+options/                   Settings page — currency, rounding mode (balance/% are set in the floating widget, see above)
 icons/                     Extension icons (currently placeholders)
 ```
 

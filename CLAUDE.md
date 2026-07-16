@@ -42,7 +42,9 @@ Consequences:
 | `shared/messaging.js` | Message type constants (`TPS_GET_QUOTE`, `TPS_GET_FX_RATE`, `TPS_GET_SIGNALS`) + `chrome.runtime`/`chrome.tabs` wrapper functions |
 | `background/background.js` | Routes `TPS_GET_QUOTE`/`TPS_GET_FX_RATE` messages to `shared/quotes.js`/`shared/fx.js`, through an in-memory 60s cache (`Map`, not persisted — fine if the service worker unloads, just costs an extra fetch) |
 | `content/content.js` | Finds `.t09.t09_open_position` cards, appends computed fields (including a *static, read-only* effective-% display) as native-looking `.t09_bl` rows (see "Injection styling" below) without touching the site's own "Количество" field, reacts to settings changes, runs a self-healing `MutationObserver` for dynamically-loaded cards, and responds to `TPS_GET_SIGNALS` messages from the popup |
-| `popup/popup.js` | Messages the active tab's content script for the current signal list (falls back to `chrome.scripting.executeScript` re-injection if the content script isn't loaded), fetches quote/FX per signal via the background worker, renders using `TPS.sizing`. Also owns the popup header's two global inputs: `accountBalanceInput` (auto-focused) and `positionPercentInput` (see "Position % override" below) |
+| `content/widget.js` | Injects the floating, fixed-position settings panel (docked to the right edge, minimize/expand) that owns `accountBalance` and `positionPercentOverride` editing — see "Floating on-page widget" below. Writes go straight through `TPS.storage.setSettings()`; it never touches card DOM itself, relying on `content.js`'s own `onSettingsChanged` listener (same page context) to recompute cards |
+| `content/widget.css` | Styling for the floating widget, deliberately matching TraderPRO's own visual language (brand blue, card radius/shadow, Montserrat) rather than the extension's popup palette — see "Floating on-page widget" below |
+| `popup/popup.js` | Messages the active tab's content script for the current signal list (falls back to `chrome.scripting.executeScript` re-injection if the content script isn't loaded), fetches quote/FX per signal via the background worker, renders using `TPS.sizing`. The header shows a **read-only** summary of `accountBalance`/`positionPercentOverride` — editing happens only in the on-page floating widget (see "Floating on-page widget" below) |
 | `options/options.js` | Auto-saving settings form bound to `TPS.storage` |
 
 ## Data flow for one signal card
@@ -57,7 +59,7 @@ Consequences:
 
 ## Position % override — global only, no per-signal override
 
-There is no per-signal position-size editing. The only two inputs to position size are the signal's own stated %, scraped as `state.statedPercent`, and a single **global** override, `settings.positionPercentOverride` (`null` = not set), configured once in the popup next to `accountBalance` — never per-card, never on the injected page. The two are reconciled by the single shared helper `TPS.sizing.resolveEffectivePercent()` (in `shared/sizing.js`, not duplicated in `content.js`/`popup.js`):
+There is no per-signal position-size editing. The only two inputs to position size are the signal's own stated %, scraped as `state.statedPercent`, and a single **global** override, `settings.positionPercentOverride` (`null` = not set), configured once in the floating on-page widget (`content/widget.js`, see "Floating on-page widget" below) next to `accountBalance` — never per-card. The two are reconciled by the single shared helper `TPS.sizing.resolveEffectivePercent()` (in `shared/sizing.js`, not duplicated in `content.js`/`widget.js`/`popup.js`):
 
 ```js
 function resolveEffectivePercent(statedPercent, globalOverride) {
@@ -65,8 +67,8 @@ function resolveEffectivePercent(statedPercent, globalOverride) {
 }
 ```
 
-- The injected "Позиция %" field on each card is **static text** (`.tps-percent-value`), not an input — there is nothing to click or edit on the TraderPRO page itself. It just reflects whatever the global override currently resolves to for that signal.
-- `popup.js`'s `positionPercentInput` is the only editable control: empty → `positionPercentOverride: null` (saved via `TPS.storage.setSettings`) → every card falls back to its own `statedPercent`; a number → every card uses that same number.
+- The injected "Позиция %" field on each *card* is **static text** (`.tps-percent-value`), not an input — there is nothing to click or edit on an individual card. It just reflects whatever the global override currently resolves to for that signal. The one editable control lives in the floating widget instead (see "Floating on-page widget" below), not on any card.
+- `widget.js`'s `tpsWidgetPercentInput` is the only editable control: empty → `positionPercentOverride: null` (saved via `TPS.storage.setSettings`) → every card falls back to its own `statedPercent`; a number → every card uses that same number.
 - If you're asked for "let me set a % on this one signal" again, that's a per-signal override — it was deliberately removed in favor of this single global one. Confirm with the user before reintroducing per-card editing; don't assume the two requests are the same.
 
 ## DOM scraping notes (this is the most fragile part of the codebase)
@@ -105,16 +107,19 @@ If you're asked to make this "more distinguishable" again, prefer adjusting the 
 
 A follow-up request to instead right-align the appended cells' text (`text-align: right` on `.lbl`/`.val`) was tried and then explicitly reverted back to this `margin-left` approach — don't reintroduce the text-align version without checking that it's actually wanted again.
 
-## Inline popup editing — the ONLY place accountBalance and positionPercentOverride are set
+## Floating on-page widget — the ONLY place accountBalance and positionPercentOverride are set
 
-Both `accountBalance` and `positionPercentOverride` are edited **exclusively** in the popup header (`accountBalanceInput` and `positionPercentInput` in `popup/popup.html`, stacked in `.tps-header-main`) — there is deliberately no balance or global-%-override field on the Options page (`options/options.html`/`options.js` only handle `accountCurrency` and rounding). If you're asked to add either somewhere else (Options, or — for the %-override — per-signal on the injected page), check first whether the intent is really "another place" or "move it back": both were explicitly consolidated to this single popup location on request. `popup.js`:
+**History:** this used to live in the popup header (`accountBalanceInput`/`positionPercentInput`, auto-focused on open). It was moved to a floating widget injected directly onto the TraderPRO page on request, so both values are visible and editable without opening the toolbar icon at all. If you're asked to move it back to the popup, or to add either field to Options, treat that as a real design change to confirm, not a revert to "the way it always was" — the popup-header version is gone, not commented out.
 
-- `bindBalanceInput()` auto-focuses and selects `accountBalanceInput` on popup open, so opening the popup (one click) is enough to start typing a new balance — no second click to find/enter an edit field. `bindPositionPercentInput()` does the equivalent for `positionPercentInput` (same debounce/save/indicator pattern) but does **not** auto-focus — balance is the field that changes daily, the % override doesn't.
-- Both debounce (300ms) writes through `TPS.storage.setSettings({...})`, mutate the shared in-memory `settings` object in place (the same object reference is threaded through the whole render chain — `buildSignalItem` → `loadAndRenderSignal` → `renderResult` — so later calls automatically see the new value), and re-render every currently-displayed signal from a `renderedItems` array (`{item, state}` pairs pushed in `loadAndRenderSignal`) without refetching price/FX. The %-override handler additionally calls `updatePercentDisplay()` directly, since `renderResult()` only updates items whose quote/fx has already loaded.
-- Because this goes through `chrome.storage.sync`, `content.js`'s `TPS.storage.onSettingsChanged` listener picks up both changes too — editing either field in the popup also live-updates the in-page injected cards on the TraderPRO tab, for free, via the existing settings-reactivity path.
-- `options.js`'s `readFormAsPartialSettings()` deliberately omits both `accountBalance` and `positionPercentOverride` from the object it saves — `TPS.storage.setSettings()` merges partial updates onto existing settings, so omitting them there preserves whatever the popup last saved instead of stomping them back to whatever stale value the Options form last saw.
+Both `accountBalance` and `positionPercentOverride` are edited **exclusively** in `content/widget.js`'s floating panel (`tpsWidgetBalanceInput` / `tpsWidgetPercentInput`), which `content/widget.js` injects into `document.body` on every `https://login.traderpro.bg/*` page load, docked to the right edge of the viewport (`position: fixed`, vertically centered, `z-index: 999999` — the right edge was picked because TraderPRO's own header/sidebar aren't fixed and nothing else on the page is ever pinned there on desktop; the off-canvas mobile nav drawer opens from the *left* at ≤991px, which is also why the widget only shrinks rather than repositions at that breakpoint, see `content/widget.css`). There is still deliberately no balance or global-%-override field on the Options page (`options/options.html`/`options.js` only handle `accountCurrency` and rounding), and the popup (`popup/popup.html`) now shows only a **read-only** summary line (`renderSettingsSummary()` in `popup.js`) — no inputs.
 
-If you add another frequently-changing setting later, follow this same pattern (inline in the popup + `chrome.storage` propagation) rather than adding it to Options.
+- `content/widget.js` is a standalone content-script file (own `js` entry in `manifest.json`, loaded alongside but independent of `content.js` — same self-bootstrapping `DOMContentLoaded`-or-immediate pattern, own IIFE, no cross-file calls between the two). It does **not** touch card DOM itself.
+- `bindBalanceInput()`/`bindPercentInput()` debounce (300ms) and write straight through `TPS.storage.setSettings({...})`, then flash a `.tps-widget-saved` ✓ for 1200ms — the same debounce/save/indicator shape the old popup version used, just without the `renderedItems` re-render loop, because that loop is unnecessary here: `content.js`'s own `TPS.storage.onSettingsChanged` listener (already registered, see "Data flow" above) runs in the *same page context* and picks up the storage write on its own, recomputing every card without `widget.js` needing to know about card DOM at all. This is the main reason the move to on-page injection simplified the code rather than complicating it — the popup needed the manual re-render loop only because it's a *separate* document from the injected cards; the widget isn't.
+- `bindExternalUpdates()` also listens via `TPS.storage.onSettingsChanged` to reflect changes made elsewhere (Options page currency, `chrome.storage.sync` pulling a value from another of the user's Chrome instances, or the widget's own writes echoing back) — guarded by `document.activeElement !== <input>` so it never clobbers a field the user is mid-typing in.
+- Minimize/expand is persisted in `settings.widgetMinimized` (boolean, synced like everything else) rather than local/session state, so the collapsed/expanded choice follows the user across reloads and their other signed-in Chrome instances. Toggling calls `TPS.storage.setSettings({ widgetMinimized: ... })`; the collapsed state renders as a small docked tab (`.tps-widget-tab`) instead of the full panel.
+- `options.js`'s `readFormAsPartialSettings()` still deliberately omits `accountBalance`, `positionPercentOverride`, and `widgetMinimized` from the object it saves — `TPS.storage.setSettings()` merges partial updates onto existing settings, so omitting them there preserves whatever the widget last saved instead of stomping it back to whatever stale value the Options form last saw.
+
+If you add another frequently-changing setting later, follow this same pattern (inline in the widget + `chrome.storage` propagation) rather than adding it to Options.
 
 ## Rounding formula (`shared/sizing.js`)
 
@@ -134,9 +139,10 @@ There is no automated test suite. Verify manually:
 1. `chrome://extensions` → Developer mode → Load unpacked.
 2. Log into `login.traderpro.bg`, open the signals page, confirm buy cards get sizing blocks and sell cards don't.
 3. Check the service worker's DevTools console (`chrome://extensions` → "service worker" link) for `TPS_GET_QUOTE`/`TPS_GET_FX_RATE` traffic and 60s caching behavior.
-4. In the popup, edit the balance and confirm every card's totals update; edit the % override (set a number, then clear it back to empty) and confirm every card's "Позиция %" and totals switch between the override and each signal's own stated % accordingly. In Options, change currency/rounding and confirm already-rendered cards update.
-5. Block `query1/query2.finance.yahoo.com` in DevTools' Network conditions to force the Stooq fallback path and confirm the "source: stooq" badge appears.
-6. Open the popup and confirm it matches the in-page numbers.
+4. On the TraderPRO page, confirm the floating widget appears docked to the right edge. Edit the balance in it and confirm every card's totals update; edit the % override (set a number, then clear it back to empty) and confirm every card's "Позиция %" and totals switch between the override and each signal's own stated % accordingly. In Options, change currency/rounding and confirm already-rendered cards *and* the widget's currency prefix update.
+5. Click the widget's minimize button, confirm it collapses to a small docked tab; click the tab, confirm it re-expands. Reload the page and confirm the collapsed/expanded state persisted (`settings.widgetMinimized`).
+6. Block `query1/query2.finance.yahoo.com` in DevTools' Network conditions to force the Stooq fallback path and confirm the "source: stooq" badge appears.
+7. Open the popup and confirm its read-only summary line matches the widget/in-page numbers.
 
 ## IBKR (do not implement without a design discussion)
 

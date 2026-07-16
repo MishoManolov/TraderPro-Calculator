@@ -1,0 +1,199 @@
+/* Floating on-page settings panel (content/widget.js) — the only place
+   accountBalance / positionPercentOverride are edited (see CLAUDE.md). Docked
+   to the right edge, vertically centered, so it sits in otherwise-unused space
+   without covering the signal cards (which live in a centered, max-width
+   content column — see CLAUDE.md's design notes for why the right edge and a
+   high z-index were chosen: nothing else on the page is ever fixed there).
+
+   Colors/radius/shadow/font intentionally mirror TraderPRO's own visual
+   language (brand blue #0077B6/#0095E6, rgba(77,97,176,.23) "elevation" shadow,
+   10px radius, Montserrat) rather than the extension's own popup palette,
+   since this panel lives on the page itself and should read as part of it. */
+
+#tps-widget,
+#tps-widget * {
+  box-sizing: border-box;
+}
+
+.tps-widget {
+  position: fixed;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  z-index: 999999;
+  font-family: "Montserrat", Arial, Helvetica, sans-serif;
+}
+
+.tps-widget-panel {
+  width: 216px;
+  background: #f9fafb;
+  border-radius: 10px 0 0 10px;
+  box-shadow: 0px 1px 16px 0 rgba(77, 97, 176, 0.23);
+  overflow: hidden;
+}
+
+.tps-widget.is-collapsed .tps-widget-panel {
+  display: none;
+}
+
+/* Collapsed state: a small docked tab, same corner/shadow treatment as the
+   panel, so expanding it doesn't feel like a different element appearing. */
+.tps-widget-tab {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  margin: 0;
+  border: none;
+  border-radius: 10px 0 0 10px;
+  background: #0077B6;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0px 1px 16px 0 rgba(77, 97, 176, 0.23);
+}
+
+.tps-widget.is-collapsed .tps-widget-tab {
+  display: flex;
+}
+
+.tps-widget-tab:hover {
+  background: #0095E6;
+}
+
+.tps-widget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 8px 9px 12px;
+  background: #0077B6;
+  color: #ffffff;
+}
+
+.tps-widget-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.tps-widget-minimize {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.tps-widget-minimize:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.tps-widget-body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tps-widget-row {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tps-widget-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #5a6b78;
+}
+
+.tps-widget-input-wrap {
+  display: flex;
+  align-items: center;
+  border: 1px solid #aaaaaa;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 0 10px;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.tps-widget-input-wrap:focus-within {
+  border-color: #0095E6;
+  box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.1);
+}
+
+.tps-widget-prefix,
+.tps-widget-suffix {
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0077B6;
+}
+
+.tps-widget-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: 8px 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0077B6;
+  font-family: inherit;
+}
+
+.tps-widget-input::placeholder {
+  color: #9db4c6;
+  font-weight: 500;
+}
+
+.tps-widget-input::-webkit-inner-spin-button,
+.tps-widget-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.tps-widget-saved {
+  position: absolute;
+  top: 0;
+  right: 0;
+  color: #2e8b57;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* Matches the site's own structural breakpoint (its sidebar collapses to an
+   off-canvas drawer at the same width) — shrink rather than reposition, since
+   that drawer opens from the left and never reaches this panel's right-edge
+   dock. */
+@media (max-width: 991px) {
+  .tps-widget-panel {
+    width: 176px;
+  }
+
+  .tps-widget-body {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .tps-widget-tab {
+    width: 34px;
+    height: 34px;
+  }
+}

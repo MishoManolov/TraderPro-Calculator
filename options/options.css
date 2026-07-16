@@ -78,6 +78,26 @@ h1 {
   margin: 8px 0 0;
 }
 
+/* Shared with help/help.html — a numbered walkthrough inside a .tps-card. */
+.tps-help-steps {
+  font-size: 14px;
+  color: #3b4a58;
+  line-height: 1.6;
+  margin: 0;
+  padding-left: 20px;
+}
+
+.tps-help-steps li {
+  margin-bottom: 6px;
+}
+
+.tps-help-steps code {
+  background: #eef2f5;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 0.9em;
+}
+
 .tps-save-status {
   position: fixed;
   bottom: 20px;

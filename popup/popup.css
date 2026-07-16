@@ -31,62 +31,55 @@ body {
   font-size: 14px;
 }
 
-.tps-balance-edit {
+/* accountBalance/positionPercentOverride are edited in the floating widget on
+   the TraderPRO page (content/widget.js) — this is a read-only reflection. */
+.tps-header-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tps-header-summary-values {
+  font-size: 12px;
+  font-weight: 600;
+  color: #21496f;
+}
+
+.tps-header-summary-hint {
+  font-size: 10px;
+  color: #5a6b78;
+  line-height: 1.4;
+}
+
+.tps-header-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  flex: 0 0 auto;
 }
 
-.tps-balance-edit-label {
-  font-size: 11px;
-  color: #5a6b78;
-  margin-right: 2px;
-}
-
-.tps-currency-prefix {
-  font-size: 13px;
-  font-weight: 600;
-  color: #21496f;
-}
-
-.tps-balance-input {
-  width: 92px;
-  padding: 4px 6px;
-  border: 1px solid #9db4c6;
-  border-radius: 4px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #1a2733;
+.tps-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
   background: #eef4f9;
-}
-
-.tps-balance-input:focus {
-  outline: none;
-  border-color: #21496f;
-  background: #ffffff;
-  box-shadow: 0 0 0 2px rgba(33, 73, 111, 0.15);
-}
-
-/* Percentages are shorter than currency amounts — narrower than the balance input. */
-.tps-percent-override-input {
-  width: 64px;
-}
-
-.tps-saved-indicator {
-  color: #2e8b57;
+  border: 1px solid #d5e0e8;
+  border-radius: 50%;
+  color: #21496f;
   font-size: 13px;
   font-weight: 700;
-  transition: opacity 0.3s ease;
+  line-height: 1;
+  cursor: pointer;
+  text-decoration: none;
+  padding: 0;
+  box-sizing: border-box;
 }
 
-.tps-link-btn {
-  background: none;
-  border: none;
-  color: #21496f;
-  font-size: 12px;
-  cursor: pointer;
-  text-decoration: underline;
-  padding: 0;
+.tps-icon-btn:hover {
+  background: #dfeaf3;
+  border-color: #9db4c6;
 }
 
 .tps-empty-state {

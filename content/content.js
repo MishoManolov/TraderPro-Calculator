@@ -6,8 +6,9 @@
 // the card. The site's own "Количество" field is left completely untouched.
 //
 // Position sizing is NOT per-signal: there is a single global % override
-// (settings.positionPercentOverride, configured once in the popup next to the
-// account balance). Each card shows the resulting effective % as a static value
+// (settings.positionPercentOverride, configured once in the floating on-page
+// widget — see content/widget.js — next to the account balance). Each card
+// shows the resulting effective % as a static value
 // (TPS.sizing.resolveEffectivePercent) — not an editable input — so all cards
 // always agree with whatever's currently configured globally.
 (function () {
@@ -120,7 +121,7 @@
       } : null;
 
       if (!settings.accountBalance) {
-        setMeta(cardId, 'hint', 'Задайте наличност по сметка в изскачащия прозорец на добавката.');
+        setMeta(cardId, 'hint', 'Задайте наличност по сметка в плаващия панел вдясно.');
       }
 
       loadPriceAndRender(cardId);
@@ -237,7 +238,7 @@
     var badgeText = TPS.format.describeSourceBadge(state.quote, state.fx);
 
     if (!settings.accountBalance) {
-      setMeta(cardId, 'hint', 'Задайте наличност по сметка в изскачащия прозорец на добавката.');
+      setMeta(cardId, 'hint', 'Задайте наличност по сметка в плаващия панел вдясно.');
     } else if (badgeText) {
       setMeta(cardId, 'badge', badgeText);
     } else {

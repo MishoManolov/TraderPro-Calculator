@@ -16,10 +16,15 @@
     // set (each signal uses its own TraderPRO-stated %); a number overrides
     // every signal uniformly. There is deliberately no per-signal override —
     // this single setting is the only way to size positions differently from
-    // what TraderPRO states, configured in the popup next to accountBalance.
+    // what TraderPRO states, configured in the floating on-page widget next to
+    // accountBalance (see content/widget.js).
     positionPercentOverride: null,
     roundingMode: 'roundDown', // 'raw' | 'roundDown' | 'roundUpThreshold'
-    roundUpThresholdAmount: 5
+    roundUpThresholdAmount: 5,
+    // Collapsed/expanded state of the floating on-page widget (content/widget.js).
+    // Synced like everything else here so it stays consistent across the user's
+    // own Chrome instances.
+    widgetMinimized: false
   };
 
   function mergeWithDefaults(stored) {

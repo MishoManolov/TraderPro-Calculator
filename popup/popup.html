@@ -2,27 +2,23 @@
 <html lang="bg">
 <head>
 <meta charset="UTF-8">
-<title>TraderPRO Position Sizer</title>
+<title>TraderPro Calculator</title>
 <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <div class="tps-popup">
     <header class="tps-popup-header">
       <div class="tps-header-main">
-        <strong>TraderPRO Position Sizer</strong>
-        <div class="tps-balance-edit">
-          <label for="accountBalanceInput" class="tps-balance-edit-label">Наличност</label>
-          <span id="balanceCurrencyPrefix" class="tps-currency-prefix">$</span>
-          <input id="accountBalanceInput" class="tps-balance-input" type="number" min="0" step="0.01" inputmode="decimal">
-          <span id="balanceSavedIndicator" class="tps-saved-indicator" hidden>✓</span>
-        </div>
-        <div class="tps-balance-edit" title="Празно = използва се % от сигнала на TraderPRO за всяка позиция. Число тук = използва се за всички позиции вместо това.">
-          <label for="positionPercentInput" class="tps-balance-edit-label">Позиция %</label>
-          <input id="positionPercentInput" class="tps-balance-input tps-percent-override-input" type="number" min="0" max="100" step="0.1" placeholder="от сигнала">
-          <span id="percentSavedIndicator" class="tps-saved-indicator" hidden>✓</span>
+        <strong>TraderPro Calculator</strong>
+        <div class="tps-header-summary">
+          <span id="settingsSummary" class="tps-header-summary-values"></span>
+          <span class="tps-header-summary-hint">Наличността и Позиция % се задават в плаващия панел на страницата на TraderPRO.</span>
         </div>
       </div>
-      <button id="openOptionsBtn" class="tps-link-btn" type="button">Настройки</button>
+      <div class="tps-header-actions">
+        <a class="tps-icon-btn" href="../help/help.html" target="_blank" rel="noopener" aria-label="Помощ" title="Помощ">?</a>
+        <button id="openOptionsBtn" class="tps-icon-btn" type="button" aria-label="Настройки" title="Настройки">⚙</button>
+      </div>
     </header>
 
     <div id="emptyState" class="tps-empty-state" hidden>
