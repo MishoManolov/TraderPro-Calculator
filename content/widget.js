@@ -32,7 +32,7 @@
             '<label for="tpsWidgetBalanceInput" class="tps-widget-label">Наличност</label>' +
             '<div class="tps-widget-input-wrap">' +
               '<span id="tpsWidgetCurrencyPrefix" class="tps-widget-prefix"></span>' +
-              '<input id="tpsWidgetBalanceInput" class="tps-widget-input" type="number" min="0" step="0.01" inputmode="decimal">' +
+              '<input id="tpsWidgetBalanceInput" class="tps-widget-input" type="text" inputmode="decimal" autocomplete="off">' +
             '</div>' +
             '<span id="tpsWidgetBalanceSaved" class="tps-widget-saved" hidden>✓</span>' +
           '</div>' +
@@ -71,12 +71,35 @@
     }, 1200);
   }
 
+  // Balance is a plain text input (not type="number") so it can display
+  // thousands separators while typing. Only digits and a single "." are ever
+  // kept; commas are re-inserted into the integer part on every keystroke,
+  // with the cursor restored by its distance from the end of the string so
+  // typing/deleting mid-number doesn't jump the caret.
+  function formatBalanceInput(value) {
+    var str = String(value);
+    if (str === '') return '';
+    var parts = str.split('.');
+    var intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return parts.length > 1 ? intPart + '.' + parts[1] : intPart;
+  }
+
   function bindBalanceInput(settings) {
     els.currencyPrefix.textContent = TPS.format.currencySymbol(settings.accountCurrency);
-    els.balanceInput.value = settings.accountBalance;
+    els.balanceInput.value = formatBalanceInput(settings.accountBalance);
 
     els.balanceInput.addEventListener('input', function () {
-      var value = parseFloat(els.balanceInput.value);
+      var cursorFromEnd = els.balanceInput.value.length - els.balanceInput.selectionStart;
+      var raw = els.balanceInput.value.replace(/[^\d.]/g, '');
+      var firstDot = raw.indexOf('.');
+      if (firstDot !== -1) raw = raw.slice(0, firstDot + 1) + raw.slice(firstDot + 1).replace(/\./g, '');
+
+      var formatted = formatBalanceInput(raw);
+      els.balanceInput.value = formatted;
+      var pos = Math.max(0, formatted.length - cursorFromEnd);
+      els.balanceInput.setSelectionRange(pos, pos);
+
+      var value = parseFloat(raw);
       if (!isFinite(value) || value < 0) return;
       if (saveTimers.balance) clearTimeout(saveTimers.balance);
       saveTimers.balance = setTimeout(function () {
@@ -134,7 +157,7 @@
       els.currencyPrefix.textContent = TPS.format.currencySymbol(newSettings.accountCurrency);
 
       if (document.activeElement !== els.balanceInput) {
-        els.balanceInput.value = newSettings.accountBalance;
+        els.balanceInput.value = formatBalanceInput(newSettings.accountBalance);
       }
       if (document.activeElement !== els.percentInput) {
         els.percentInput.value = (newSettings.positionPercentOverride === null || newSettings.positionPercentOverride === undefined)
