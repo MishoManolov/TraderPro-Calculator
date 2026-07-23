@@ -62,12 +62,12 @@ Paste one of these into the corresponding field for each permission the dashboar
 |---|---|
 | `storage` | Stores the user's account balance, currency, rounding preference, strategy-weight multiplier, and per-signal ticker/target-price/classification corrections locally via `chrome.storage.sync`, so their settings follow them across their own signed-in Chrome instances. No data leaves the browser. |
 | `scripting` | Used only as a fallback: if the toolbar popup can't reach an already-loaded content script on the active TraderPRO tab (e.g. right after installing, before the tab is reloaded), it re-injects the content script via `chrome.scripting.executeScript` so the popup still works immediately. |
-| `host_permissions: https://*.traderpro.bg/*` | The extension's content script runs here to read buy-signal cards on the page and append position-sizing fields next to them. This is the extension's core function. |
+| `host_permissions: https://*.traderpro.bg/*` | The extension's content script runs here to read buy and rebalance-to-% signal cards on the page and append position-sizing fields next to them. This is the extension's core function. |
 | `host_permissions: https://query1.finance.yahoo.com/*`, `https://query2.finance.yahoo.com/*` | Fetches live share prices and FX rates from Yahoo Finance's public chart endpoint (no API key) to compute position sizes. |
 | `host_permissions: https://stooq.com/*` | Fallback price source used only if Yahoo Finance is unreachable. |
 | `host_permissions: https://api.frankfurter.app/*` | Fallback FX-rate source (free ECB reference rates) used only if Yahoo's FX data is unreachable. |
 
-**Single purpose description:** Adds live position-sizing calculations (price, share count, total cost) to buy signals on the TraderPRO trading-signals website, based on a user-entered account balance.
+**Single purpose description:** Adds live position-sizing calculations (price, share count, total cost, or a buy/sell/hold rebalance trade) to buy and rebalance signals on the TraderPRO trading-signals website, based on a user-entered account balance.
 
 ## Packaging the release zip
 
@@ -79,11 +79,12 @@ The repo working directory has dev-only files (`.git/`, `.claude/`, `CLAUDE.md`,
 cd TraderPro-Calculator
 zip -r ../traderpro-calculator-v$(python3 -c "import json;print(json.load(open('manifest.json'))['version'])").zip \
   manifest.json background content help icons options popup shared \
-  -x "*.DS_Store"
+  -x "*.DS_Store" -x "icons/*-source.svg"
 ```
 
 This produces a zip one directory above the repo containing only the six runtime folders + `manifest.json` — verify
-with `unzip -l` before uploading that no dev files snuck in.
+with `unzip -l` before uploading that no dev files snuck in (in particular, `icons/icon-source.svg` is a design
+reference, not used by `manifest.json`'s icon declarations — the `-x` above excludes it).
 
 ## Post-approval follow-up
 
