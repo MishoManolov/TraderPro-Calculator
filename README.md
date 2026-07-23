@@ -12,7 +12,7 @@ For every **buy** ("КУПУВА" / open-position) and **rebalance** ("Реба�
 
 **Plain buy signals** get:
 - **Използван символ** — the ticker actually used for pricing this card (normally the site's own scraped symbol; editable, see below).
-- **Позиция %** — the position size actually being used: the signal's own stated %, scaled by your strategy weight if you've set one (see [Strategy weight](#strategy-weight-not-per-signal)). The site's own "Количество" field is never touched — this is a separate, read-only display.
+- **Позиция %** — the position size actually being used: the signal's own stated %, scaled by your strategy weight if you've set one (see [Strategy weight is global](#strategy-weight-is-global--per-signal-corrections-are-per-signal)). The site's own "Количество" field is never touched — this is a separate, read-only display.
 - **Цена / бр.**, **Брой акции**, and the total cost in both the stock's own currency and your account currency.
 
 **Rebalance-to-% signals** ("Ребалансира" — adjust this position to become X% of the portfolio) get the same ticker/price rows, plus:
@@ -37,15 +37,19 @@ Two fields on every buy/rebalance card have a small pencil (✎) icon next to th
 
 Both corrections apply only to that one signal — a later signal for the same ticker starts fresh rather than inheriting an old correction — and both save automatically (debounced, with a small ✓ confirming the save) and sync across your own signed-in Chrome instances.
 
-## Installation (unpacked — not yet on the Chrome Web Store)
+## Installation
 
-This extension isn't published on the Chrome Web Store, so it's loaded as an "unpacked" extension straight from this folder — the standard way to run a local/dev Chrome extension.
+### From the Chrome Web Store (recommended)
+
+[Install TraderPro Calculator](https://chromewebstore.google.com/detail/traderpro-calculator/dgfchfccgelimbbocigbgbgimclpdjkd) — click **Add to Chrome**, then continue to [Getting started](#getting-started-first-time-setup) below. Updates are delivered automatically like any other Chrome Web Store extension.
+
+### Unpacked, from source (for development, or to run changes before they're published)
 
 1. Download or `git clone` this repository somewhere permanent on disk (don't install from a temp folder — Chrome re-reads the extension from this location every time it loads, and deleting/moving the folder later will break or remove the extension).
 2. Open `chrome://extensions` in Chrome (type it directly into the address bar — it's a special internal page, not something you can search to).
 3. Turn on **Developer mode** using the toggle in the top-right corner. This unlocks the **Load unpacked** button (without it, Chrome only accepts extensions from the Web Store).
 4. Click **Load unpacked**, then select this project's root folder (the one containing `manifest.json`).
-5. The extension now appears in your extensions list as "TraderPro Calculator" and its icon appears in the toolbar (you may need to click the puzzle-piece icon in the toolbar and pin it for quicker access).
+5. The extension now appears in your extensions list as "TraderPro Calculator" and its icon appears in the toolbar (you may need to click the puzzle-piece icon in the toolbar and pin it for quicker access). If you already installed it from the Chrome Web Store, either remove that one first or be aware you'll have two entries.
 6. Chrome grants the extension's declared permissions automatically at load time for unpacked extensions — see [Enabling site access](#enabling-site-access-chrome-permissions) below if you ever need to double-check or fix this.
 7. Continue to [Getting started](#getting-started-first-time-setup) below to set your account balance and start using it.
 

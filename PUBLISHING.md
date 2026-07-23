@@ -2,6 +2,8 @@
 
 Reference material for the Developer Dashboard submission. This is copy-paste text and a packaging command, not app code — nothing here is loaded by the extension itself.
 
+**Live listing:** https://chromewebstore.google.com/detail/traderpro-calculator/dgfchfccgelimbbocigbgbgimclpdjkd (item ID `dgfchfccgelimbbocigbgbgimclpdjkd`). This extension is already published — updates go through the [Developer Dashboard](https://chrome.google.com/webstore/devconsole/) against this existing item, not a new submission.
+
 ## Store listing
 
 **Short description** (132 char limit):
@@ -86,8 +88,13 @@ This produces a zip one directory above the repo containing only the six runtime
 with `unzip -l` before uploading that no dev files snuck in (in particular, `icons/icon-source.svg` is a design
 reference, not used by `manifest.json`'s icon declarations — the `-x` above excludes it).
 
-## Post-approval follow-up
+## Updating an already-published listing
 
-Once the listing is live, update `README.md`'s "Installation" heading and steps 1–7 — they currently describe
-**unpacked-only** installation ("not yet on the Chrome Web Store"); add a "install from the Chrome Web Store" path
-once there's a real listing URL to link.
+For a version bump (not a first submission):
+
+1. Bump `manifest.json`'s `version` — the Developer Dashboard rejects an upload whose version isn't strictly higher than the currently published one.
+2. Build the zip (see "Packaging the release zip" above).
+3. Open the [Developer Dashboard](https://chrome.google.com/webstore/devconsole/), select this item, go to **Package**, and upload the new zip.
+4. If the store listing text/screenshots changed (description, category, screenshots in `store-assets/screenshots/`), update the **Store listing** tab too — the dashboard doesn't pull these from the zip.
+5. Submit for review. A version update that doesn't add new permissions (check `manifest.json`'s `permissions`/`host_permissions` against what's already approved) typically reviews faster than a first submission or a permissions change.
+6. Once approved, it publishes automatically unless the dashboard is set to manual publish for this item — check the **Store listing** status after approval.
