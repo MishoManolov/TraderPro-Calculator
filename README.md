@@ -167,7 +167,7 @@ content/content.js         Content script — scrapes signal cards, injects the 
 content/widget.js          Content script — floating balance/strategy-weight widget docked to the page's right edge
 popup/                     Toolbar popup — mirrors the signals list, shows a read-only balance/weight summary
 options/                   Settings page — currency, rounding mode (balance/weight are set in the floating widget)
-icons/                     Extension icons (+ − × ÷ on a rounded square; icon-source.svg / icon16-source.svg are the editable sources)
+icons/                     Extension icons (ascending bar-chart glyph on a rounded square; icon-source.svg is the editable source)
 store-assets/screenshots/  Chrome Web Store listing screenshots (see PUBLISHING.md)
 ```
 
