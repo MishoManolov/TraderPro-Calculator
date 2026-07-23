@@ -16,7 +16,12 @@ desktop.ini
 *.crx
 *.pem
 
-# Local reference copy of a live TraderPRO page (design/context reference only,
-# not for redistribution — may contain the contributor's own session data)
+# Local reference copies of a live TraderPRO page (design/context reference
+# only, not for redistribution — may contain the contributor's own session/
+# strategy data). Ask the contributor for a fresh saved copy if you need one
+# for manual testing or store-screenshot generation; don't assume one exists.
 TraderPRO - example page.html
 TraderPRO - example page_files/
+TraderPRO - etf_strategy (rebalancing).html
+TraderPRO - safe_page.html
+TraderPRO - safe_page_files/

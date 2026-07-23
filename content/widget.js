@@ -9,8 +9,8 @@
 (function () {
   var WIDGET_ID = 'tps-widget';
   var els = null;
-  var saveTimers = { balance: null, percent: null };
-  var indicatorTimers = { balance: null, percent: null };
+  var saveTimers = { balance: null, weight: null };
+  var indicatorTimers = { balance: null, weight: null };
 
   function buildWidget(settings) {
     var root = document.createElement('div');
@@ -36,13 +36,13 @@
             '</div>' +
             '<span id="tpsWidgetBalanceSaved" class="tps-widget-saved" hidden>✓</span>' +
           '</div>' +
-          '<div class="tps-widget-row" title="Празно = използва се % от сигнала на TraderPRO за всяка позиция. Число тук = използва се за всички позиции вместо това.">' +
-            '<label for="tpsWidgetPercentInput" class="tps-widget-label">Позиция %</label>' +
+          '<div class="tps-widget-row" title="Умножава % на всеки сигнал — за отваряне на позиция или за ребаланс до % (сигнал % × тегло). Празно = 100% (без промяна).">' +
+            '<label for="tpsWidgetWeightInput" class="tps-widget-label">Тегло на стратегия %</label>' +
             '<div class="tps-widget-input-wrap">' +
-              '<input id="tpsWidgetPercentInput" class="tps-widget-input" type="number" min="0" max="100" step="0.1" placeholder="от сигнала">' +
+              '<input id="tpsWidgetWeightInput" class="tps-widget-input" type="number" min="0" step="0.1" placeholder="100">' +
               '<span class="tps-widget-suffix">%</span>' +
             '</div>' +
-            '<span id="tpsWidgetPercentSaved" class="tps-widget-saved" hidden>✓</span>' +
+            '<span id="tpsWidgetWeightSaved" class="tps-widget-saved" hidden>✓</span>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -58,8 +58,8 @@
       currencyPrefix: root.querySelector('#tpsWidgetCurrencyPrefix'),
       balanceInput: root.querySelector('#tpsWidgetBalanceInput'),
       balanceSaved: root.querySelector('#tpsWidgetBalanceSaved'),
-      percentInput: root.querySelector('#tpsWidgetPercentInput'),
-      percentSaved: root.querySelector('#tpsWidgetPercentSaved')
+      weightInput: root.querySelector('#tpsWidgetWeightInput'),
+      weightSaved: root.querySelector('#tpsWidgetWeightSaved')
     };
   }
 
@@ -110,23 +110,25 @@
     });
   }
 
-  // The one global position-size override, applied to every signal — see
-  // TPS.sizing.resolveEffectivePercent(). Left empty, each signal uses its own
-  // TraderPRO-stated %; a number here overrides all of them uniformly. No
-  // per-signal override exists (deliberately removed, see CLAUDE.md).
-  function bindPercentInput(settings) {
-    if (settings.positionPercentOverride !== null && settings.positionPercentOverride !== undefined) {
-      els.percentInput.value = settings.positionPercentOverride;
+  // The one global strategy-weight multiplier, applied to every signal's own
+  // target % — open/buy and rebalance-to-% alike — see
+  // TPS.sizing.applyStrategyWeight(). Left empty, treated as 100 (no scaling —
+  // each signal is sized at its own TraderPRO-stated/target %); a number here
+  // multiplies every signal's % by weight/100 instead of replacing it. No
+  // per-signal weight exists (deliberately removed, see CLAUDE.md).
+  function bindWeightInput(settings) {
+    if (settings.strategyWeightPercent !== null && settings.strategyWeightPercent !== undefined) {
+      els.weightInput.value = settings.strategyWeightPercent;
     }
 
-    els.percentInput.addEventListener('input', function () {
-      var raw = els.percentInput.value.trim();
-      if (saveTimers.percent) clearTimeout(saveTimers.percent);
-      saveTimers.percent = setTimeout(function () {
+    els.weightInput.addEventListener('input', function () {
+      var raw = els.weightInput.value.trim();
+      if (saveTimers.weight) clearTimeout(saveTimers.weight);
+      saveTimers.weight = setTimeout(function () {
         var value = raw === '' ? null : parseFloat(raw);
-        if (value !== null && !isFinite(value)) return;
-        TPS.storage.setSettings({ positionPercentOverride: value }).then(function () {
-          flashSaved(els.percentSaved, 'percent');
+        if (value !== null && (!isFinite(value) || value < 0)) return;
+        TPS.storage.setSettings({ strategyWeightPercent: value }).then(function () {
+          flashSaved(els.weightSaved, 'weight');
         });
       }, 300);
     });
@@ -159,16 +161,24 @@
       if (document.activeElement !== els.balanceInput) {
         els.balanceInput.value = formatBalanceInput(newSettings.accountBalance);
       }
-      if (document.activeElement !== els.percentInput) {
-        els.percentInput.value = (newSettings.positionPercentOverride === null || newSettings.positionPercentOverride === undefined)
+      if (document.activeElement !== els.weightInput) {
+        els.weightInput.value = (newSettings.strategyWeightPercent === null || newSettings.strategyWeightPercent === undefined)
           ? ''
-          : newSettings.positionPercentOverride;
+          : newSettings.strategyWeightPercent;
       }
       setCollapsed(!!newSettings.widgetMinimized);
     });
   }
 
+  // Signal (buy/sell strategy) pages are ?go=strategy&p=detail&courseId=...;
+  // course pages use go=courses instead — go is the field that distinguishes
+  // them, so that's the only thing checked here.
+  function isSignalPage() {
+    return new URLSearchParams(window.location.search).get('go') === 'strategy';
+  }
+
   function init() {
+    if (!isSignalPage()) return;
     if (document.getElementById(WIDGET_ID)) return; // already injected (e.g. popup's re-injection fallback)
 
     TPS.storage.getSettings().then(function (settings) {
@@ -177,7 +187,7 @@
       els = cacheEls(root);
 
       bindBalanceInput(settings);
-      bindPercentInput(settings);
+      bindWeightInput(settings);
       bindMinimize();
       bindExternalUpdates();
     });

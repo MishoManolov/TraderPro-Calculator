@@ -2,10 +2,11 @@
 (function (global) {
   global.TPS = global.TPS || {};
 
-  // Buy/open-position cards only. Sell/close-position cards (.t09_close_position)
-  // are never selected — they don't carry a meaningful position-size % and are
-  // intentionally left untouched by this extension.
-  var CARD_SELECTOR = '.t09.t09_open_position';
+  // Both open- and close-position cards are scanned: a rebalance-down signal can
+  // render under t09_close_position, and the "Цел" (goal) field — not the card's
+  // open/close class — is what actually decides a card's meaning. See
+  // TPS.classify.classifySignal(), which interprets goalText/quantityRaw.
+  var CARD_SELECTOR = '.t09.t09_open_position, .t09.t09_close_position';
   var BLOCK_SELECTOR = '.t09_bl';
   var BODY_SELECTOR = '.t09_1';
 
@@ -17,22 +18,18 @@
     instrument: 'Инструмент',
     exchange: 'Борса',
     ticker: 'Символ',
+    goal: 'Цел',
     quantityPercent: 'Количество'
   };
 
-  function parsePercent(text) {
-    if (!text) return 0;
-    var n = parseFloat(String(text).replace(',', '.').replace('%', '').trim());
-    return isFinite(n) ? n : 0;
-  }
-
   /**
    * @param {Element} cardEl
-   * @returns {{ticker:string, instrument:string, exchange:string, date:string, statedPercent:number}|null}
+   * @returns {{ticker:string, tickerAliases:string[], instrument:string, exchange:string,
+   *            date:string, goalText:string, quantityRaw:string}|null}
    *          null if ticker is missing (malformed card — caller should skip it, not break the page).
-   *          The site's own "Количество" field is read here for its stated % but is never
-   *          modified by the extension — there is no per-signal override, only a global
-   *          one in settings.positionPercentOverride. See TPS.sizing.resolveEffectivePercent().
+   *          goalText/quantityRaw are returned raw and unparsed — TPS.classify.classifySignal()
+   *          owns interpreting them into a signal type + target %, not this module. The site's
+   *          own "Количество" field is only ever read here, never modified.
    */
   function scrapeCard(cardEl) {
     var fields = {};
@@ -47,15 +44,18 @@
       else if (lbl === LABELS.instrument) fields.instrument = val;
       else if (lbl === LABELS.exchange) fields.exchange = val;
       else if (lbl === LABELS.ticker) fields.ticker = val;
-      else if (lbl === LABELS.quantityPercent) fields.statedPercentRaw = val;
+      else if (lbl === LABELS.goal) fields.goalText = val;
+      else if (lbl === LABELS.quantityPercent) fields.quantityRaw = val;
     }
     if (!fields.ticker) return null;
     return {
       ticker: fields.ticker,
+      tickerAliases: TPS.classify.parseTickerAliases(fields.ticker),
       instrument: fields.instrument || '',
       exchange: fields.exchange || '',
       date: fields.date || '',
-      statedPercent: parsePercent(fields.statedPercentRaw)
+      goalText: fields.goalText || '',
+      quantityRaw: fields.quantityRaw || ''
     };
   }
 
@@ -73,7 +73,6 @@
     BLOCK_SELECTOR: BLOCK_SELECTOR,
     BODY_SELECTOR: BODY_SELECTOR,
     LABELS: LABELS,
-    parsePercent: parsePercent,
     scrapeCard: scrapeCard,
     findCards: findCards,
     getCardBody: getCardBody

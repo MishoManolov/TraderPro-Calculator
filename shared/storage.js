@@ -12,13 +12,15 @@
     schemaVersion: SCHEMA_VERSION,
     accountBalance: 0,
     accountCurrency: 'USD',
-    // Global position-size override, applied to every buy signal. null = not
-    // set (each signal uses its own TraderPRO-stated %); a number overrides
-    // every signal uniformly. There is deliberately no per-signal override —
-    // this single setting is the only way to size positions differently from
-    // what TraderPRO states, configured in the floating on-page widget next to
-    // accountBalance (see content/widget.js).
-    positionPercentOverride: null,
+    // Portfolio-wide strategy weight, applied to every signal's own target %
+    // uniformly — plain open/buy and rebalance-to-% alike (see CLAUDE.md
+    // "Rebalance signals"). null = not set, treated as 100 (no scaling — each
+    // signal is sized at its own TraderPRO-stated/target %). A number
+    // multiplies every signal's % by weight/100, e.g. a 50% weight halves
+    // every resulting position size. This is a multiplier, not a substitute —
+    // it never replaces a signal's own %, only scales it. Configured in the
+    // floating on-page widget next to accountBalance (see content/widget.js).
+    strategyWeightPercent: null,
     roundingMode: 'roundDown', // 'raw' | 'roundDown' | 'roundUpThreshold'
     roundUpThresholdAmount: 5,
     // Collapsed/expanded state of the floating on-page widget (content/widget.js).

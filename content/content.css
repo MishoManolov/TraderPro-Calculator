@@ -1,8 +1,17 @@
 /* Deliberately minimal: injected rows reuse the site's own .t09_bl/.lbl/.val
    classes so they inherit its real typography/spacing/colors instead of
    fighting them. Distinguishability comes from a single divider line above the
-   appended section (.tps-divider) — no icons, no per-cell borders/accents;
-   those were tried and looked like visual noise/glitches against the real page.
+   appended section (.tps-divider) — no per-cell borders/accents; those were
+   tried and looked like visual noise/glitches against the real page.
+
+   Exception: the ticker-override and target-price rows DO carry a small pencil
+   icon (.tps-edit-icon) — but that's a different feature than the reverted one
+   above. The earlier attempt put a marker icon on every appended field purely
+   to visually separate "ours" from "native" — that's what got reverted. These
+   icons instead mark two specific fields as editable/correctable, only on the
+   fields where editing is actually possible, so the icon has a function beyond
+   decoration. Don't spread this to every field "for consistency" — it was
+   reintroduced narrowly, for a reason.
 
    Important layout fact this file depends on: TraderPRO's ".t09_1" is a CSS
    grid (5 columns in the observed layout) where each ".t09_bl" is exactly one
@@ -65,4 +74,75 @@
 
 [hidden] {
   display: none !important;
+}
+
+/* "Current shares held" (rebalance cards) and the manual-classification
+   fallback controls (unknown-type cards) — each is the sole child of its
+   .val, so the two-children space-between gotcha noted above doesn't apply. */
+.tps-input,
+.tps-select {
+  font: inherit;
+  color: inherit;
+  width: 100%;
+  max-width: 8em;
+  padding: 2px 4px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 3px;
+  background: #fff;
+}
+
+.tps-action-value.tps-action-buy {
+  color: #1e7e34;
+  font-weight: 600;
+}
+
+.tps-action-value.tps-action-sell {
+  color: #c0392b;
+  font-weight: 600;
+}
+
+.tps-action-value.tps-action-hold {
+  opacity: 0.75;
+}
+
+/* Ticker-override / target-price rows: pencil icon + display text + hidden
+   input + hidden struck-through original + hidden saved-checkmark, all inside
+   one wrapper (the sole child of .val, per the single-child rule above). */
+.tps-editable-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tps-edit-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 0.9em;
+  opacity: 0.6;
+}
+
+.tps-edit-icon:hover {
+  opacity: 1;
+}
+
+.tps-edit-icon:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.tps-original-value {
+  text-decoration: line-through;
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+
+.tps-inline-saved {
+  color: #1e7e34;
+  font-weight: 700;
+}
+
+.tps-ticker-input {
+  max-width: 6em;
 }

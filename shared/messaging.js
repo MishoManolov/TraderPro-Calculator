@@ -27,6 +27,23 @@
     });
   }
 
+  // Tries each ticker alias in order (see TPS.classify.parseTickerAliases —
+  // the site can show a symbol as "ETL2 / COMF"), stopping at the first one
+  // that resolves. Mirrors the shape of shared/quotes.js's own Yahoo->Stooq
+  // fallback, just one level up (across aliases instead of across sources).
+  function requestQuoteForAliasesOrThrow(aliases, fallbackMessage) {
+    if (!aliases || !aliases.length) return Promise.reject(new Error(fallbackMessage));
+    var lastError = null;
+    function tryAt(i) {
+      if (i >= aliases.length) return Promise.reject(lastError || new Error(fallbackMessage));
+      return requestQuoteOrThrow(aliases[i], fallbackMessage).catch(function (err) {
+        lastError = err;
+        return tryAt(i + 1);
+      });
+    }
+    return tryAt(0);
+  }
+
   function resolveFxRate(quoteCurrency, accountCurrency, fallbackMessage) {
     if (quoteCurrency === accountCurrency) {
       return Promise.resolve({ rate: 1, source: 'identity' });
@@ -43,6 +60,7 @@
     requestFxRate: requestFxRate,
     requestSignalsFromTab: requestSignalsFromTab,
     requestQuoteOrThrow: requestQuoteOrThrow,
+    requestQuoteForAliasesOrThrow: requestQuoteForAliasesOrThrow,
     resolveFxRate: resolveFxRate
   };
 })(typeof self !== 'undefined' ? self : this);

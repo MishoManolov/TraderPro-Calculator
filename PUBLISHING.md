@@ -6,23 +6,26 @@ Reference material for the Developer Dashboard submission. This is copy-paste te
 
 **Short description** (132 char limit):
 ```
-Live position-sizing math for TraderPRO buy signals: price, share count, and total cost, in your own currency.
+Live position sizing for TraderPRO buy/rebalance signals: price, shares, cost, currency conversion, and inline corrections.
 ```
 
 **Detailed description** (include the trademark disclaimer verbatim — this mirrors README.md):
 ```
-TraderPro Calculator adds live position-sizing math directly onto TraderPRO's buy signals: current price, the
-position-size % being used, the resulting share count, and the total cost — in both the stock's own currency and
-your account currency.
+TraderPro Calculator adds live position-sizing math directly onto TraderPRO's buy and rebalance-to-% signals:
+current price, the position-size % being used, the resulting share count, and the total cost — in both the
+stock's own currency and your account currency.
 
-For every buy signal, the extension appends a few read-only fields below the site's own fields, styled to match
-the page. A floating panel on the page (dock to the right edge, minimize any time) is where you set your account
-balance and an optional global position-size % override. Sell/close-position signals are left untouched.
+For every buy or rebalance signal, the extension appends a few fields below the site's own fields, styled to
+match the page. If a signal's ticker is malformed or its price should come from a manually-entered target
+instead of the live quote, a small pencil icon next to each field lets you correct it right there — the
+correction applies only to that one signal and is remembered across reloads. A floating panel on the page (dock
+to the right edge, minimize any time) is where you set your account balance and an optional global strategy-
+weight multiplier. Sell/close-position signals are left untouched.
 
 Prices come from Yahoo Finance's public chart endpoint (falling back to Stooq), currency conversion from Yahoo's
 FX pseudo-tickers (falling back to Frankfurter.app) — all free, keyless, public data sources. Nothing is sent to
-any server the developer controls, because there isn't one; your balance and settings stay in your own browser
-(chrome.storage.sync).
+any server the developer controls, because there isn't one; your balance, settings, and per-signal corrections
+stay in your own browser (chrome.storage.sync).
 
 Not affiliated with, endorsed by, or sponsored by TraderPRO. Not financial advice — always double-check the
 numbers before placing a trade.
@@ -30,13 +33,21 @@ numbers before placing a trade.
 
 **Category suggestion:** Productivity (or Tools, depending on what's available at submission time).
 
+**Screenshots:** ready-made 1280×800 PNGs for the listing's screenshot slots are in `store-assets/screenshots/`
+(generated from a sanitized saved copy of a real signals page — no real account name/data). Upload them in this
+order for a natural progression: `01-position-sizing.png` (core feature — sizing on a buy card), then
+`02-ticker-price-override.png` (the ticker/target-price correction feature), then `03-floating-widget.png`
+(where balance/strategy weight are configured). This folder is dev-only reference material, same as `CLAUDE.md`
+— see "Packaging the release zip" below, it's excluded from the uploaded package.
+
 ## Privacy practices tab
 
 - **Does this item collect or transmit personal or sensitive user data?** No.
 - **Data collection disclosure:** This extension collects nothing and has no backend server. `chrome.storage.sync`
-  is used only to store the user's own account balance, currency, rounding preference, and position-%-override
-  locally (synced by Chrome across the user's own signed-in browsers) — never transmitted anywhere by this
-  extension. See the "Privacy / security" section of the README for the full explanation.
+  is used only to store the user's own account balance, currency, rounding preference, strategy-weight
+  multiplier, and per-signal ticker/target-price/classification corrections locally (synced by Chrome across the
+  user's own signed-in browsers) — never transmitted anywhere by this extension. See the "Privacy / security"
+  section of the README for the full explanation.
 - **Privacy policy URL:**
   ```
   https://github.com/MishoManolov/TraderPro-Calculator#privacy--security
@@ -49,7 +60,7 @@ Paste one of these into the corresponding field for each permission the dashboar
 
 | Permission | Justification |
 |---|---|
-| `storage` | Stores the user's account balance, currency, rounding preference, and position-size override locally via `chrome.storage.sync`, so their settings follow them across their own signed-in Chrome instances. No data leaves the browser. |
+| `storage` | Stores the user's account balance, currency, rounding preference, strategy-weight multiplier, and per-signal ticker/target-price/classification corrections locally via `chrome.storage.sync`, so their settings follow them across their own signed-in Chrome instances. No data leaves the browser. |
 | `scripting` | Used only as a fallback: if the toolbar popup can't reach an already-loaded content script on the active TraderPRO tab (e.g. right after installing, before the tab is reloaded), it re-injects the content script via `chrome.scripting.executeScript` so the popup still works immediately. |
 | `host_permissions: https://*.traderpro.bg/*` | The extension's content script runs here to read buy-signal cards on the page and append position-sizing fields next to them. This is the extension's core function. |
 | `host_permissions: https://query1.finance.yahoo.com/*`, `https://query2.finance.yahoo.com/*` | Fetches live share prices and FX rates from Yahoo Finance's public chart endpoint (no API key) to compute position sizes. |
@@ -60,9 +71,9 @@ Paste one of these into the corresponding field for each permission the dashboar
 
 ## Packaging the release zip
 
-The repo working directory has dev-only files (`.git/`, `.claude/`, `CLAUDE.md`, `README.md`, `PUBLISHING.md`, and
-a gitignored local copy of a TraderPRO page used for design reference) that must **not** go into the uploaded
-package. Build the zip from a clean file list instead of zipping the whole folder:
+The repo working directory has dev-only files (`.git/`, `.claude/`, `CLAUDE.md`, `README.md`, `PUBLISHING.md`,
+`store-assets/`, and gitignored local copies of TraderPRO pages used for design reference/screenshots) that must
+**not** go into the uploaded package. Build the zip from a clean file list instead of zipping the whole folder:
 
 ```bash
 cd TraderPro-Calculator

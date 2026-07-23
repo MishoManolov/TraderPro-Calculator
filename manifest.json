@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "TraderPro Calculator",
-  "description": "Adds live share-count and cost calculations to TraderPRO buy signals, with currency conversion and configurable rounding.",
-  "version": "1.0.0",
+  "description": "Live position sizing for TraderPRO buy/rebalance signals: price, shares, cost, currency conversion, and inline corrections.",
+  "version": "1.1.0",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
@@ -34,6 +34,8 @@
       "js": [
         "shared/storage.js",
         "shared/messaging.js",
+        "shared/classify.js",
+        "shared/positions.js",
         "shared/sizing.js",
         "shared/scrape.js",
         "shared/format.js",
