@@ -1,0 +1,6 @@
+default: L3
+classes:
+  bug: L3
+  feature: L3
+  improvement: L3
+  new_project: L3
