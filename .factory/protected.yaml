@@ -1,0 +1,6 @@
+protected_paths:
+  - ".factory/**"
+  - "manifest.json"
+  - "PUBLISHING.md"
+  - "store-assets/**"
+  - ".claude/**"
