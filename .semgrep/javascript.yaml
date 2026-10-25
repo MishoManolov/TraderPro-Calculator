@@ -1,0 +1,34 @@
+rules:
+  - id: factory.js-eval
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: eval and new Function run whatever text they are given.
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: new Function(...)
+  - id: factory.js-tls-unchecked
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: Turning off certificate checks lets anyone sit between the program and the server.
+    pattern-either:
+      - pattern: "{..., rejectUnauthorized: false, ...}"
+      - pattern: process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"
+  - id: factory.js-exec-text
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: child_process.exec runs a shell command line; pass arguments to execFile instead.
+    pattern-either:
+      - pattern: child_process.exec($X, ...)
+      - pattern: require("child_process").exec($X, ...)
+  - id: factory.js-inner-html
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: Writing text into innerHTML lets markup in it run; use textContent.
+    pattern: $EL.innerHTML = $X
+  - id: factory.js-weak-hash
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: md5 and sha1 are broken for security uses; use sha256 or better.
+    pattern-either:
+      - pattern: crypto.createHash("md5")
+      - pattern: crypto.createHash("sha1")
