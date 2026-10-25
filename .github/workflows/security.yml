@@ -1,0 +1,40 @@
+# Secret and code scanning for pull requests (Gitleaks on the commits, Semgrep on what the change adds).
+name: security
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Look for secrets in the commits of this change
+        run: |
+          RANGE="${{ github.event.pull_request.base.sha }}..${{ github.sha }}"
+          [ "${{ github.event_name }}" = "push" ] && RANGE="${{ github.event.before }}..${{ github.sha }}"
+          case "$RANGE" in 0000000*|..*) RANGE="-1" ;; esac
+          docker run --rm -v "$PWD:/src" -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/src \
+            ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f \
+            git /src --log-opts "$RANGE" --redact --no-banner --exit-code 1
+  semgrep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Look for risky code in what this change adds
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          [ "${{ github.event_name }}" = "push" ] && BASE="${{ github.event.before }}"
+          FROM="--baseline-commit $BASE"
+          case "$BASE" in 0000000*|"") FROM="" ;; esac
+          docker run --rm -v "$PWD:/src" -w /src -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/src \
+            semgrep/semgrep@sha256:529ee8a277ec8adc5b534d7c74eea0a47e9de21d62852b6ba7ac6ba9566845c3 \
+            semgrep scan --config /src/.semgrep --severity ERROR --error $FROM --metrics off --disable-version-check
