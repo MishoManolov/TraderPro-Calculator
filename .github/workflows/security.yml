@@ -33,8 +33,8 @@ jobs:
         run: |
           BASE="${{ github.event.pull_request.base.sha }}"
           [ "${{ github.event_name }}" = "push" ] && BASE="${{ github.event.before }}"
-          FROM="--baseline-commit $BASE"
-          case "$BASE" in 0000000*|"") FROM="" ;; esac
+          FROM=()
+          case "$BASE" in 0000000*|"") ;; *) FROM=(--baseline-commit "$BASE") ;; esac
           docker run --rm -v "$PWD:/src" -w /src -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/src \
             semgrep/semgrep@sha256:529ee8a277ec8adc5b534d7c74eea0a47e9de21d62852b6ba7ac6ba9566845c3 \
-            semgrep scan --config /src/.semgrep --severity ERROR --error $FROM --metrics off --disable-version-check
+            semgrep scan --config /src/.semgrep --severity ERROR --error "${FROM[@]}" --metrics off --disable-version-check
